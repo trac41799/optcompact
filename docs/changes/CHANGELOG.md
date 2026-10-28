@@ -4,11 +4,16 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-10-29
+
 ### Added
 
-- Live headless smoke proof for the DeepSeek Harness plugin: two committed compactions through the stock backend ([report](../qa/runs/2026-10-29-live-dsh.md)).
+- Live headless proof for the DeepSeek Harness plugin: two committed compactions through the stock backend ([report](../qa/runs/2026-10-29-live-dsh.md)).
 - Step-boundary snapping for compaction cuts, so a cut cannot split a step.
 - JSONL decision evidence for the harness adapter, including skip reasons and committed ranges.
+- Codex app-server JSON-RPC client with handshake, thread creation, and compaction calls.
+- Codex protocol check: newline-delimited framing, `thread/start`, and `thread/compact/start` verified ([report](../qa/runs/2026-10-29-codex-protocol.md)).
+- BDD acceptance suite in `packages/core/test/acceptance.test.ts`.
 
 ### Fixed
 

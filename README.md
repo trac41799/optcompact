@@ -9,7 +9,7 @@ Fixed pressure thresholds (80% of the window, one global limit) ignore what the 
 - **Model:** reuse hazard × re-derivation cost, Weibull rate-distortion fidelity, prefix-gain scheduling, renewal-reward interval.
 - **Engine:** dependency-free TypeScript, deterministic, no model call on the decision path.
 - **Adapters:** DeepSeek Harness policy plugin, Codex app-server controller and hook parser.
-- **Evidence:** seeded simulator with latent reuse, plus 41 unit and contract tests.
+- **Evidence:** seeded simulator with latent reuse, plus 56 unit, contract, and acceptance tests.
 
 ## Decision in one equation
 
@@ -118,9 +118,10 @@ docs/qa            testing strategy and run evidence
 
 ## Status and limitations
 
-- v0.1.0. The model and both adapters are implemented.
+- v0.1.1. The model and both adapters are implemented.
 - The DeepSeek Harness plugin passed a live headless run with two committed compactions.
-- Live Codex compaction is unverified. Web and Desktop DSH presets still need an isolated-group override.
+- The Codex app-server protocol is verified. A full compaction of a populated thread waits on account quota.
+- Web and Desktop DSH presets still need an isolated-group override.
 - Need coverage is not task success. Task-level evaluation is the next gate.
 - Defaults are hypotheses. Calibration per model and summarizer is required before production use.
 

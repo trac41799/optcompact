@@ -1,6 +1,6 @@
 {
   "name": "@optcompact/dsh",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DeepSeek Harness compaction policy plugin: model-driven when-to-compact over the stock compaction backend.",
   "license": "MIT",
   "type": "module",

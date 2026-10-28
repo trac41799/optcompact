@@ -1,6 +1,6 @@
 {
   "name": "@optcompact/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dependency-free compaction decision model: reuse hazard, rate-distortion fidelity, and prefix-gain scheduling.",
   "license": "MIT",
   "type": "module",

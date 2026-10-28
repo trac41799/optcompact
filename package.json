@@ -1,6 +1,6 @@
 {
   "name": "optcompact",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Optimal context-compaction scheduling for coding agents: a rate-distortion and hazard-based decision model, with DeepSeek Harness and Codex adapters.",
   "license": "MIT",

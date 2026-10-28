@@ -33,8 +33,21 @@ After Codex confirms a compaction item, call `policy.noteCompaction(threadId)`.
 
 `parseCompactHook(stdinText)` turns a `PreCompact` or `PostCompact` payload into a record. Use it to log compaction events; do not return `continue: false` unless aborting the turn is acceptable.
 
+## Client
+
+`CodexAppServer.connect()` spawns the server, performs the handshake, starts a thread, and sends `thread/compact/start`. The framing is newline-delimited JSON, verified against codex-cli 0.164.0 ([report](../../docs/qa/runs/2026-10-29-codex-protocol.md)).
+
+```ts
+import { CodexAppServer } from '@optcompact/codex';
+
+const server = await CodexAppServer.connect();
+const threadId = await server.startThread(process.cwd());
+await server.compact(threadId);
+server.close();
+```
+
 ## Limits
 
-- The app-server protocol is experimental and was unverified end to end in this environment because the account hit its usage limit.
+- A full compaction of a populated thread is unverified because the account hit its usage limit. Framing, handshake, thread creation, and the compaction call are verified.
 - Usage updates are post-hoc; they are not the exact model-visible token count before a request.
 - Hooks cannot veto by skipping, only by aborting.

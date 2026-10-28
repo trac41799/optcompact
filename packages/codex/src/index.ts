@@ -15,6 +15,8 @@ import {
 } from '@optcompact/core';
 
 /** Token usage reported by `thread/tokenUsage/updated`. */
+export { CodexAppServer, JsonRpcClient } from './appserver.ts';
+
 export interface CodexUsage {
   inputTokens: number;
   outputTokens?: number;

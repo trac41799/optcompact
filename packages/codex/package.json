@@ -1,6 +1,6 @@
 {
   "name": "@optcompact/codex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex integration for OptCompact: app-server control loop plus PreCompact/PostCompact hook evidence.",
   "license": "MIT",
   "type": "module",

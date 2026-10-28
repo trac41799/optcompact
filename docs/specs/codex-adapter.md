@@ -35,9 +35,14 @@ Codex CLI 0.164.x. The app-server protocol is experimental and changes without n
 - **R3.** A hook handler MUST NOT return `continue: false` by default.
 - **R4.** The package MUST document that the app-server path is experimental.
 
+## Protocol status
+
+Verified on 2026-10-29 against codex-cli 0.164.0: newline-delimited JSON, `initialize`, `thread/start` (id at `result.thread.id`), and `thread/compact/start` all respond. Evidence: [protocol check](../qa/runs/2026-10-29-codex-protocol.md). A compaction of a populated thread remains unverified because the account hit its usage limit.
+
 ## Acceptance criteria
 
-- **AC-1** A usage stream that crosses the model gate produces exactly one compaction request.
-- **AC-2** `noteCompaction` applies the cooldown.
-- **AC-3** A `PostCompact` payload parses into a record with event, trigger, session, and timestamp.
-- **AC-4** No code path calls `continue: false` unless a caller opts in.
+- **AC-1** A usage stream that crosses the model gate produces exactly one compaction request. Met by `packages/codex/test/policy.test.ts`.
+- **AC-2** `noteCompaction` applies the cooldown. Met.
+- **AC-3** A `PostCompact` payload parses into a record with event, trigger, session, and timestamp. Met.
+- **AC-4** No code path calls `continue: false` unless a caller opts in. Met by construction.
+- **AC-5** JSON-RPC requests correlate to responses and reject on error. Met by `packages/codex/test/appserver.test.ts`.
