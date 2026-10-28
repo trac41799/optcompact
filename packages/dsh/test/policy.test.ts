@@ -97,6 +97,41 @@ test('never lets a decision error escape', async () => {
   await assert.rejects(() => maybeCompact(ctx, {}, makeAgent(), 3, new AbortController().signal));
 });
 
+test('prunes tool results before deciding when load is high', async () => {
+  let pruneCalls = 0;
+  let measureCalls = 0;
+  const { ctx } = makeContext();
+  const pruner = { pruneSession: () => { pruneCalls += 1; } };
+  const original = ctx.tokenMeter.measure;
+  ctx.tokenMeter.measure = () => {
+    measureCalls += 1;
+    if (measureCalls === 1) {
+      return { totalTokens: 95_000, surfaceTokens: 95_000, nodes: [{ seq: 1, tokens: 95_000, heuristicTokens: 95_000 }] };
+    }
+    return original(ctx as never);
+  };
+  (ctx as unknown as { get: (name: string) => unknown }).get = (name) => (name === 'toolResultPruner' ? pruner : undefined);
+  await maybeCompact(ctx, { pruneAt: 0.4 }, makeAgent(), 30, new AbortController().signal);
+  assert.equal(pruneCalls, 1);
+  assert.equal(measureCalls, 2);
+});
+
+test('does not prune below the prune threshold', async () => {
+  let pruneCalls = 0;
+  const { ctx } = makeContext();
+  const pruner = { pruneSession: () => { pruneCalls += 1; } };
+  (ctx as unknown as { get: (name: string) => unknown }).get = (name) => (name === 'toolResultPruner' ? pruner : undefined);
+  await maybeCompact(ctx, { pruneAt: 0.9 }, makeAgent(), 30, new AbortController().signal);
+  assert.equal(pruneCalls, 0);
+});
+
+test('works when no pruner service is mounted', async () => {
+  const { ctx } = makeContext();
+  (ctx as unknown as { get: (name: string) => unknown }).get = () => undefined;
+  const decision = await maybeCompact(ctx, { pruneAt: 0.4 }, makeAgent(), 30, new AbortController().signal);
+  assert.ok(decision === null || typeof decision.action === 'string');
+});
+
 test('snaps a cut to a step boundary marked by a user message', () => {
   const seqs = [10, 20, 30, 40, 50];
   const types: Record<number, string> = {

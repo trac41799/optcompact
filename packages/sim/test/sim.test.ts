@@ -38,7 +38,7 @@ test('comparison returns one result per policy', () => {
   const results = runComparison(session);
   assert.deepEqual(
     results.map((r) => r.policy),
-    ['never', 'fixed', 'periodic', 'hazard']
+    ['never', 'fixed', 'periodic', 'hazard', 'planned']
   );
   for (const result of results) {
     assert.ok(result.tokensSpent > 0);

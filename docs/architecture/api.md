@@ -15,6 +15,7 @@ This page is the living contract for the core package. Harness adapters MAY depe
 | `ewmaGrowth(deltas, alpha)` | function | Exponentially weighted growth estimate; zero for an empty sample |
 | `summaryFidelity(input)` | function | Value fraction in `[0, 1]`; equals 1 at full retention |
 | `economicInterval(input)` | function | Positive turns; throws on non-positive growth, price, or retention |
+| `planSchedule(input)` | function | Token-minimal interval and retention for a quality target; throws on an invalid horizon or target |
 | `extractAnchors(text)` | function | Deduplicated weighted anchors, deterministic order |
 | `anchorRetentionScore(anchors, text)` | function | Weighted fraction in `[0, 1]`; returns 1 for no anchors |
 | `defaultParams(overrides)` | function | Complete parameter object; never shares mutable nested state |

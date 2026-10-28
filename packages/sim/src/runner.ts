@@ -3,7 +3,7 @@
  *
  * @module
  */
-import { decide, defaultParams, type ContextUnit, type PolicyState } from '@optcompact/core';
+import { decide, defaultParams, planSchedule, type ContextUnit, type PolicyState } from '@optcompact/core';
 import { hashUnit } from './generator.ts';
 import type { PolicyName, SimOptions, SimResult, SimSession, SimUnit, SimUnitType } from './types.ts';
 
@@ -30,11 +30,11 @@ function trueFidelity(type: SimUnitType, retentionRatio: number, spanTokens: num
   return Math.max(0, 1 - (1 - TRUE_CEILING[type]) * distortion * (1 - retentionRatio));
 }
 
-function cutForTarget(units: readonly SimUnit[], targetTokens: number): number {
-  let remaining = units.reduce((sum, u) => sum + u.tokens, 0);
+function cutForTarget(units: readonly SimUnit[], targetTokens: number, sizeOf: (u: SimUnit) => number): number {
+  let remaining = units.reduce((sum, u) => sum + sizeOf(u), 0);
   let cut = 0;
   while (cut < units.length - 1 && remaining > targetTokens) {
-    remaining -= units[cut]!.tokens;
+    remaining -= sizeOf(units[cut]!);
     cut += 1;
   }
   return cut;
@@ -64,7 +64,9 @@ export function simulatePolicy(
   const unitIndex = new Map(session.units.map((u, i) => [u.id, i] as const));
   const live = new Map<string, boolean>();
   const fidelity = new Map<string, number>();
+  const scale = new Map<string, number>();
   const lastNeed = new Map<string, number>();
+  const sizeOf = (u: SimUnit): number => Math.round(u.tokens * (scale.get(u.id) ?? 1));
   let checkpointTokens = 0;
   let checkpointFidelity = 1;
   let contextTokens = 0;
@@ -78,15 +80,29 @@ export function simulatePolicy(
   let maxContextTokens = 0;
   let inputTokens = 0;
   let lastCompactionTurn: number | undefined;
+  let planned: ReturnType<typeof planSchedule> | undefined;
 
   for (let turn = 1; turn <= session.turns; turn += 1) {
     const all = allowedUnits(session, turn);
     for (const u of all) if (!live.has(u.id)) live.set(u.id, true);
     const liveUnits = all.filter((u) => live.get(u.id));
-    contextTokens = checkpointTokens + liveUnits.reduce((sum, u) => sum + u.tokens, 0);
+    contextTokens = checkpointTokens + liveUnits.reduce((sum, u) => sum + sizeOf(u), 0);
+
+    const pruneScale = options.pruneScale ?? 0.2;
+    const pruneAge = options.pruneAge ?? 2;
+    const pruneMinTokens = options.pruneMinTokens ?? 3_000;
+    const pruneLoad = options.pruneLoad ?? 0.45;
+    if (policy === 'prune' && contextTokens / session.windowTokens > pruneLoad) {
+      for (const u of liveUnits) {
+        if (u.type !== 'tool' || scale.has(u.id) || u.tokens < pruneMinTokens) continue;
+        if (turn - u.createdTurn < pruneAge) continue;
+        scale.set(u.id, pruneScale);
+      }
+      contextTokens = checkpointTokens + liveUnits.reduce((sum, u) => sum + sizeOf(u), 0);
+    }
 
     let cut = 0;
-    let retentionRatio = 0.16;
+    let retentionRatio = options.retentionRatio ?? 0.16;
     let includeCheckpoint = true;
 
     if (policy === 'hazard') {
@@ -119,19 +135,38 @@ export function simulatePolicy(
         retentionRatio = decision.retentionRatio;
         includeCheckpoint = decision.diagnostics.includedCheckpoint;
       }
-    } else if (policy === 'fixed') {
+    } else if (policy === 'fixed' || policy === 'prune') {
       if (contextTokens / session.windowTokens >= fixedLoad) {
-        cut = cutForTarget(liveUnits, targetLoad * session.windowTokens - checkpointTokens);
+        cut = cutForTarget(liveUnits, targetLoad * session.windowTokens - checkpointTokens, sizeOf);
       }
     } else if (policy === 'periodic') {
       if (turn % periodicTurns === 0) {
-        cut = cutForTarget(liveUnits, targetLoad * session.windowTokens - checkpointTokens);
+        cut = cutForTarget(liveUnits, targetLoad * session.windowTokens - checkpointTokens, sizeOf);
+      }
+    } else if (policy === 'planned') {
+      planned ??= planSchedule({
+        horizonTurns: session.turns,
+        growthPerTurn: 6_000,
+        windowTokens: session.windowTokens,
+        outputReserveTokens: 8_000,
+        prices: { input: 1, output: 4, fixedCallCost },
+        params,
+        qualityTarget: options.qualityTarget ?? 0.9,
+        retentionRatio
+      });
+      retentionRatio = planned.retentionRatio;
+      if (planned.intervalTurns > 1 && turn % planned.intervalTurns === 0 && turn < session.turns) {
+        cut = cutForTarget(
+          liveUnits,
+          params.tailRatio * (session.windowTokens - 8_000) - checkpointTokens,
+          sizeOf
+        );
       }
     }
 
     if (contextTokens > session.windowTokens) {
       overflowTurns += 1;
-      cut = cutForTarget(liveUnits, targetLoad * session.windowTokens - checkpointTokens);
+      cut = cutForTarget(liveUnits, targetLoad * session.windowTokens - checkpointTokens, sizeOf);
     }
 
     if (cut > 0) {
@@ -162,7 +197,7 @@ export function simulatePolicy(
       compactions += 1;
       lastCompactionTurn = turn;
       const remaining = all.filter((u) => live.get(u.id));
-      contextTokens = checkpointTokens + remaining.reduce((sum, u) => sum + u.tokens, 0);
+      contextTokens = checkpointTokens + remaining.reduce((sum, u) => sum + sizeOf(u), 0);
     }
 
     maxContextTokens = Math.max(maxContextTokens, contextTokens);
@@ -175,6 +210,14 @@ export function simulatePolicy(
       needs += 1;
       lastNeed.set(u.id, turn);
       if (live.get(u.id)) {
+        if ((scale.get(u.id) ?? 1) < 1) {
+          const kept = hashUnit(session.seed ^ 0x2545f491, turn, unitIndex.get(u.id) ?? 0);
+          if (kept >= 0.8) {
+            lost += 1;
+            reworkTokens += u.costMultiplier * u.tokens;
+            continue;
+          }
+        }
         satisfied += 1;
         continue;
       }
@@ -206,6 +249,6 @@ export function simulatePolicy(
 
 /** Run every baseline plus the hazard policy on one session. */
 export function runComparison(session: SimSession, options: SimOptions = {}): SimResult[] {
-  const policies: PolicyName[] = ['never', 'fixed', 'periodic', 'hazard'];
+  const policies: PolicyName[] = ['never', 'fixed', 'periodic', 'hazard', 'planned'];
   return policies.map((policy) => simulatePolicy(session, policy, options));
 }

@@ -60,6 +60,8 @@ export interface DshLlm {
 /** Structural subset of the Cordis context used by this plugin. */
 export interface DshContext {
   on(event: string, handler: (...args: never[]) => unknown, prepend?: boolean): unknown;
+  /** Locate an optional service without a hard injection requirement. */
+  get?(name: string): unknown;
   logger: { warn(message: string): void; info?(message: string): void };
   tokenMeter: DshTokenMeter;
   llm: DshLlm;
@@ -82,6 +84,23 @@ export interface DshConfig {
   onDecision?: (decision: Decision, agent: DshAgent, turn: number) => void;
   /** Append-only JSONL path for decision evidence. */
   evidencePath?: string;
+  /** Run the mounted tool-result pruner before deciding. Defaults to true. */
+  prune?: boolean;
+  /** Load fraction at which pruning runs. Defaults to 0.45. */
+  pruneAt?: number;
+}
+
+interface PrunerService {
+  pruneSession(session: DshSession): unknown;
+}
+
+function optionalPruner(ctx: DshContext): PrunerService | undefined {
+  try {
+    const service = ctx.get?.('toolResultPruner') as PrunerService | undefined;
+    return service && typeof service.pruneSession === 'function' ? service : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const DEFAULT_PRICES = { input: 1, output: 4, fixedCallCost: 20_000 };
@@ -206,7 +225,22 @@ export async function maybeCompact(
     return null;
   }
 
-  const measurement = ctx.tokenMeter.measure(agent.session);
+  let measurement = ctx.tokenMeter.measure(agent.session);
+  let pruned = false;
+  const pruneAt = config.pruneAt ?? 0.45;
+  const loadBefore = (measurement.surfaceTokens || measurement.totalTokens) / info.context.contextWindow;
+  if (config.prune !== false && loadBefore >= pruneAt) {
+    const pruner = optionalPruner(ctx);
+    if (pruner) {
+      try {
+        pruner.pruneSession(agent.session);
+        measurement = ctx.tokenMeter.measure(agent.session);
+        pruned = true;
+      } catch (error) {
+        ctx.logger.warn(`optcompact: prune failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
   const contextTokens = measurement.surfaceTokens || measurement.totalTokens;
   const { units, seqs } = buildUnits(measurement, turn, config.firstCompactableNode ?? 1);
   if (units.length < 2) {
@@ -238,7 +272,8 @@ export async function maybeCompact(
     windowTokens: state.windowTokens,
     contextTokens: state.contextTokens,
     units: units.length,
-    tailFloorTokens: decision.diagnostics.tailFloorTokens
+    tailFloorTokens: decision.diagnostics.tailFloorTokens,
+    pruned
   });
   config.onDecision?.(decision, agent, turn);
   if (decision.action !== 'compact') return decision;

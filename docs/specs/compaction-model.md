@@ -387,7 +387,29 @@ Defaults are hypotheses. Calibration replaces them per model and per harness.
 - **AC-9** No candidate below `qualityFloor` is selected.
 - **AC-10** A checkpoint below `checkpointFloor` is never folded into a new summary.
 
-## 18. Simulation evidence
+## 18. Multi-compaction schedule
+
+A session that compacts more than once accumulates carrying cost, summary cost, and fidelity loss. The planner minimizes the sum over a horizon:
+
+$$
+C(T,\rho)=\sum_{t=1}^{H}N_t+\sum_{k=1}^{\lfloor H/T\rfloor}\big(c_0+\lambda_{\text{in}}S_k+\lambda_o\rho S_k\big)+\kappa\sum_{i}(1-\varphi_i^{m_i})\,s_i
+$$
+
+`m_i` is the number of compactions unit `i` survived. The planner scans `T` over the horizon and `ρ` over a retention grid, discards candidates below `quality_target`, and returns the cheapest survivor. `planSchedule` implements this scan.
+
+The planner is advisory. A session whose real quality falls below the target must recalibrate `φ`. The measured gap is about six points at strict targets.
+
+## 19. Tier order
+
+Cheap, model-free reductions run before model-written summaries:
+
+1. prune over-budget tool results when load crosses `prune_at`;
+2. re-measure the surface;
+3. summarize only if the post-prune gain stays positive.
+
+Pruning dominates at the recommended point: 11.13M tokens at 97.20% coverage against 11.93M at 96.85% for a fixed threshold. Evidence: [token optimization run](../qa/runs/2026-10-29-token-optimization.md).
+
+## 20. Simulation evidence
 
 A seeded simulator compares four policies on 20 sessions of 100 turns with a 200,000-token window. It uses latent reuse hazards and a pessimistic ground-truth fidelity curve, both hidden from the policy. Full method and caveats are in the [simulation run report](../qa/runs/2026-10-29-simulation.md).
 

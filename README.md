@@ -34,8 +34,12 @@ Compact the oldest prefix when its summed gain clears the gate. `V_i` is a disco
 | Periodic 15 turns | 12.94M | 96.9% | 7.7 |
 | **OptCompact (default)** | **4.50M** | **83.2%** | 30.6 |
 | OptCompact (quality floor 0.95) | 12.16M | 95.0% | 15.2 |
+| **Prune old tool results, then compact** | **11.13M** | **97.2%** | 3.5 |
+| Prune, compact harder (lowest at ≥96.6%) | 10.68M | 96.7% | 2.8 |
 
-The result is a frontier, not a single number. Default settings trade 13.7 points of need coverage for a 62% token reduction. The quality-first profile recovers coverage at no token advantage over the fixed baseline. Method and threats to validity: [`docs/qa/runs/2026-10-29-simulation.md`](docs/qa/runs/2026-10-29-simulation.md).
+The result is a frontier, not a single number. Default settings trade 13.7 points of need coverage for a 62% token reduction. The quality-first profile recovers coverage at no token advantage over the fixed baseline.
+
+The v0.3.0 tiered policy dominates the fixed baseline at the high-quality end: pruning old tool results before summarizing retains 97.2% of needs at 11.13M tokens, against 96.9% at 11.93M. Method and threats to validity: [`docs/qa/runs/2026-10-29-token-optimization.md`](docs/qa/runs/2026-10-29-token-optimization.md).
 
 ## Packages
 
@@ -120,7 +124,7 @@ docs/qa            testing strategy and run evidence
 
 ## Status and limitations
 
-- v0.2.0. The model and both adapters are implemented.
+- v0.3.0. The model and both adapters are implemented.
 - The DeepSeek Harness plugin passed a live headless run with two committed compactions.
 - The Codex app-server protocol is verified. A full compaction of a populated thread waits on account quota.
 - Web and Desktop use a generated preset overlay. Composition is verified; a live Web boot was not run in this repository.

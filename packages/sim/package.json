@@ -1,6 +1,6 @@
 {
   "name": "@optcompact/sim",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Seeded ground-truth simulator for comparing compaction policies.",
   "license": "MIT",
   "type": "module",

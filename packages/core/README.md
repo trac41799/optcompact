@@ -15,6 +15,7 @@ import { decide, defaultParams, economicInterval, anchorRetentionScore, extractA
 | `fitReuseTau`, `ewmaGrowth` | Calibration estimators for decay and growth |
 | `summaryFidelity` | Rate-distortion fidelity curve with generation penalty |
 | `economicInterval` | Renewal-reward interval `sqrt(2c0/(λρg))` |
+| `planSchedule` | Multi-compaction interval and retention ratio minimizing cumulative tokens under a quality target |
 | `extractAnchors`, `anchorRetentionScore` | Retained-quality measurement |
 | `defaultParams`, `DEFAULTS` | Calibratable defaults |
 | `isToolBalanced` | Cut validation for assistant tool pairs |

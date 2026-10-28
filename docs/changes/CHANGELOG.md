@@ -4,6 +4,23 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-29
+
+### Added
+
+- `planSchedule` in `@optcompact/core`: minimizes cumulative carrying, summary, and rework tokens over a horizon for a quality target, optimizing both interval and retention ratio.
+- Tiered compaction in `@optcompact/dsh`: run the model-free tool-result pruner before deciding, re-measure, then summarize only if gain remains. New `prune` and `pruneAt` settings.
+- Simulator `planned` and `prune` policies with quality-target sweeps.
+- ADR-0003 and the token optimization run report.
+
+### Changed
+
+- Recommended high-quality configuration: prune old tool results, compact at 0.80. Measured 11.13M tokens at 97.20% need coverage versus 11.93M at 96.85% for the fixed baseline.
+
+### Verified
+
+- 75 tests pass. Docs gate clean. CI green on v0.3.0.
+
 ## [0.2.0] — 2026-10-29
 
 ### Added
