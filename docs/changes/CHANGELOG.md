@@ -4,6 +4,17 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Live headless smoke proof for the DeepSeek Harness plugin: two committed compactions through the stock backend ([report](../qa/runs/2026-10-29-live-dsh.md)).
+- Step-boundary snapping for compaction cuts, so a cut cannot split a step.
+- JSONL decision evidence for the harness adapter, including skip reasons and committed ranges.
+
+### Fixed
+
+- The plugin now resolves the routed model from `agent.options` when no request header exists yet.
+- Removed the default export that prevented Cordis from reading the plugin `inject` list.
+
 ## [0.1.0] — 2026-10-29
 
 ### Added

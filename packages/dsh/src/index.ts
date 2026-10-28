@@ -6,6 +6,7 @@
  *
  * @module
  */
+import { appendFileSync } from 'node:fs';
 import { decide, defaultParams, type ContextUnit, type Decision, type PolicyParams, type PolicyState } from '@optcompact/core';
 
 /** One token-priced surface node, structural subset of `TokenSurfaceNode`. */
@@ -26,11 +27,14 @@ export interface DshMeasurement {
 export interface DshSession {
   surface: { nodes: readonly number[]; replaceGeneration: number };
   requestHeader?: () => { config?: { provider?: string; model?: string; maxTokens?: number } } | undefined;
+  /** Read one committed event, used to snap a cut to a step boundary. */
+  eventAt?: (seq: number) => { type?: string } | undefined;
 }
 
 /** Structural subset of `Agent`. */
 export interface DshAgent {
   session: DshSession;
+  options?: { provider?: string; model?: string; maxTokens?: number };
 }
 
 /** Structural subset of `ctx.compaction`. */
@@ -56,7 +60,7 @@ export interface DshLlm {
 /** Structural subset of the Cordis context used by this plugin. */
 export interface DshContext {
   on(event: string, handler: (...args: never[]) => unknown, prepend?: boolean): unknown;
-  logger: { warn(message: string): void };
+  logger: { warn(message: string): void; info?(message: string): void };
   tokenMeter: DshTokenMeter;
   llm: DshLlm;
   compaction: DshCompaction;
@@ -76,6 +80,8 @@ export interface DshConfig {
   growthPerTurn?: number;
   /** Receives every decision for logging or evidence. */
   onDecision?: (decision: Decision, agent: DshAgent, turn: number) => void;
+  /** Append-only JSONL path for decision evidence. */
+  evidencePath?: string;
 }
 
 const DEFAULT_PRICES = { input: 1, output: 4, fixedCallCost: 20_000 };
@@ -89,11 +95,66 @@ function growthFor(agent: DshAgent, config: DshConfig, turn: number, tokens: num
   return Math.max(0, (tokens - previous.tokens) / (turn - previous.turn));
 }
 
+/** Append one decision record, never failing the turn. */
+function recordEvidence(
+  path: string | undefined,
+  turn: number,
+  decision: Decision,
+  extra: Record<string, unknown> = {}
+): void {
+  if (!path) return;
+  writeEvidence(path, {
+    turn,
+    action: decision.action,
+    urgency: decision.urgency,
+    cutIndex: decision.cutIndex,
+    shadowTokens: decision.shadowTokens,
+    retentionRatio: decision.retentionRatio,
+    expectedGainTokens: decision.expectedGainTokens,
+    expectedQualityLoss: decision.expectedQualityLoss,
+    cer: Number.isFinite(decision.cer) ? decision.cer : null,
+    reasons: decision.reasons,
+    ...extra
+  });
+}
+
+/** Record why the policy could not decide, never failing the turn. */
+function recordSkip(path: string | undefined, turn: number, reason: string): void {
+  if (!path) return;
+  writeEvidence(path, { turn, action: 'skip', reason });
+}
+
+function writeEvidence(path: string, record: Record<string, unknown>): void {
+  try {
+    appendFileSync(path, `${JSON.stringify(record)}\n`, 'utf8');
+  } catch {
+    // Evidence is advisory; a failed write must not affect the turn.
+  }
+}
+
 function unitType(tokens: number, index: number): ContextUnit['type'] {
   if (index === 0) return 'decision';
   if (tokens >= 4_000) return 'tool';
   if (tokens >= 1_000) return 'file';
   return 'chatter';
+}
+
+/**
+ * Snap a cut so the first retained node is a user message, which is a step
+ * boundary. Returns zero when no boundary exists in the compactable prefix.
+ */
+export function snapCutToStep(
+  seqs: readonly number[],
+  cut: number,
+  typeOf: (seq: number) => string | undefined
+): number {
+  let k = Math.min(Math.max(0, cut), Math.max(0, seqs.length - 1));
+  while (k > 0) {
+    const seq = seqs[k];
+    if (seq !== undefined && typeOf(seq) === 'user/message') return k;
+    k -= 1;
+  }
+  return 0;
 }
 
 /** Map surface nodes to model units, oldest first. */
@@ -124,17 +185,34 @@ export async function maybeCompact(
   turn: number,
   signal: AbortSignal
 ): Promise<Decision | null> {
-  if (signal.aborted) return null;
-  const target = agent.session.requestHeader?.()?.config;
-  if (!target?.provider || !target?.model) return null;
+  if (signal.aborted) {
+    recordSkip(config.evidencePath, turn, 'aborted');
+    return null;
+  }
+  const header = agent.session.requestHeader?.()?.config;
+  const target = header?.provider && header.model ? header : agent.options;
+  if (!target?.provider || !target?.model) {
+    recordSkip(config.evidencePath, turn, 'no-target');
+    return null;
+  }
 
   const info = await ctx.llm.resolveModelInfo(target.provider, target.model, signal);
-  if (signal.aborted || !info.context) return null;
+  if (signal.aborted) {
+    recordSkip(config.evidencePath, turn, 'aborted');
+    return null;
+  }
+  if (!info.context) {
+    recordSkip(config.evidencePath, turn, 'no-window');
+    return null;
+  }
 
   const measurement = ctx.tokenMeter.measure(agent.session);
   const contextTokens = measurement.surfaceTokens || measurement.totalTokens;
   const { units, seqs } = buildUnits(measurement, turn, config.firstCompactableNode ?? 1);
-  if (units.length < 2) return null;
+  if (units.length < 2) {
+    recordSkip(config.evidencePath, turn, 'insufficient-units');
+    return null;
+  }
 
   const params = defaultParams(config.params);
   const prices = {
@@ -156,22 +234,48 @@ export async function maybeCompact(
   };
 
   const decision = decide(state);
+  recordEvidence(config.evidencePath, turn, decision, {
+    windowTokens: state.windowTokens,
+    contextTokens: state.contextTokens,
+    units: units.length,
+    tailFloorTokens: decision.diagnostics.tailFloorTokens
+  });
   config.onDecision?.(decision, agent, turn);
   if (decision.action !== 'compact') return decision;
   if (signal.aborted) return decision;
 
-  const endSeq = seqs[decision.cutIndex - 1];
+  let cut = decision.cutIndex;
+  if (agent.session.eventAt) {
+    const typeOf = (seq: number): string | undefined => agent.session.eventAt?.(seq)?.type;
+    cut = snapCutToStep(seqs, cut, typeOf);
+    if (cut === 0) {
+      recordSkip(config.evidencePath, turn, 'no-step-boundary');
+      return null;
+    }
+  }
+
+  const endSeq = seqs[cut - 1];
   const startSeq = seqs[0];
   if (startSeq === undefined || endSeq === undefined) return decision;
 
   await ctx.compaction.compactRegion(startSeq, endSeq, agent, signal);
   lastCompaction.set(agent.session, turn);
+  writeEvidence(config.evidencePath ?? '', {
+    turn,
+    action: 'compacted',
+    cutIndex: cut,
+    startSeq,
+    endSeq
+  });
   return decision;
 }
 
 /** Register the plugin handlers; returns a disposer. */
 export function install(ctx: DshContext, config: DshConfig = {}): () => void {
   const disposers: unknown[] = [];
+  ctx.logger.info?.(
+    `optcompact: policy active (firstCompactableNode=${config.firstCompactableNode ?? 1}, qualityFloor=${config.params?.qualityFloor ?? 0.7})`
+  );
 
   disposers.push(
     ctx.on('agent/pre-step', async (payload: unknown, next: () => Promise<unknown>) => {
@@ -179,7 +283,9 @@ export function install(ctx: DshContext, config: DshConfig = {}): () => void {
       try {
         await maybeCompact(ctx, config, agent, turn, signal);
       } catch (error) {
-        ctx.logger.warn(`optcompact: ${error instanceof Error ? error.message : String(error)}; continuing the step`);
+        const message = error instanceof Error ? error.message : String(error);
+        recordSkip(config.evidencePath, turn, `error:${message}`);
+        ctx.logger.warn(`optcompact: ${message}; continuing the step`);
       }
       return next();
     })
@@ -219,5 +325,3 @@ export const inject = ['compaction', 'tokenMeter', 'llm'];
 export function apply(ctx: DshContext, config: DshConfig = {}): () => void {
   return install(ctx, config);
 }
-
-export default apply;

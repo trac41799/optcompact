@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { install, maybeCompact, type DshAgent, type DshContext } from '../src/index.ts';
+import { install, maybeCompact, snapCutToStep, type DshAgent, type DshContext } from '../src/index.ts';
 
 function makeContext(overrides: Record<string, unknown> = {}) {
   const calls: Array<{ start: number; end: number }> = [];
@@ -92,6 +95,35 @@ test('never lets a decision error escape', async () => {
     }
   });
   await assert.rejects(() => maybeCompact(ctx, {}, makeAgent(), 3, new AbortController().signal));
+});
+
+test('snaps a cut to a step boundary marked by a user message', () => {
+  const seqs = [10, 20, 30, 40, 50];
+  const types: Record<number, string> = {
+    10: 'user/message',
+    20: 'assistant/message',
+    30: 'tool/result',
+    40: 'user/message',
+    50: 'assistant/message'
+  };
+  const typeOf = (seq: number): string | undefined => types[seq];
+  assert.equal(snapCutToStep(seqs, 4, typeOf), 3);
+  assert.equal(snapCutToStep(seqs, 3, typeOf), 3);
+  assert.equal(snapCutToStep(seqs, 2, typeOf), 0);
+});
+
+test('writes one JSONL evidence record per decision', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'optcompact-'));
+  const path = join(dir, 'events.jsonl');
+  const { ctx } = makeContext();
+  await maybeCompact(ctx, { evidencePath: path }, makeAgent(), 30, new AbortController().signal);
+  const lines = readFileSync(path, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 2);
+  const decision = JSON.parse(lines[0]!) as { turn: number; action: string };
+  const committed = JSON.parse(lines[1]!) as { turn: number; action: string };
+  assert.equal(decision.turn, 30);
+  assert.equal(decision.action, 'compact');
+  assert.equal(committed.action, 'compacted');
 });
 
 test('install registers pre-step and overflow handlers', () => {

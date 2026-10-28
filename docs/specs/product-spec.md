@@ -50,7 +50,7 @@ The engine is a pure function over `PolicyState`. Adapters map harness events to
 | Economic interval estimator | Delivered | `packages/core/test/interval.test.ts` |
 | Anchor retention metric | Delivered | `packages/core/test/metrics.test.ts` |
 | Simulator and baselines | Delivered | `packages/sim`, `docs/qa/runs/2026-10-29-simulation.md` |
-| DeepSeek Harness adapter | Delivered, live mount unverified | `packages/dsh/test/policy.test.ts` |
+| DeepSeek Harness adapter | Delivered and live-verified in a headless profile | `packages/dsh/test/policy.test.ts`, [live run](../qa/runs/2026-10-29-live-dsh.md) |
 | Codex adapter | Delivered as library, live compaction unverified | `packages/codex/test/policy.test.ts` |
 | CLI | Deferred | not needed for v0.1 |
 | CI and public release | In progress | Task 6 |
@@ -66,8 +66,8 @@ The engine is a pure function over `PolicyState`. Adapters map harness events to
 ## Acceptance criteria
 
 - **AC-1** All core tests pass.
-- **AC-2** The DSH plugin loads in a real DeepSeek Harness composition.
-- **AC-3** A long DSH session compacts before overflow and continues.
+- **AC-2** The DSH plugin loads in a real DeepSeek Harness composition. Met: [live run](../qa/runs/2026-10-29-live-dsh.md).
+- **AC-3** A DSH session compacts through the stock backend and continues. Met twice in the live run; the long-session overflow case remains open.
 - **AC-4** The Codex adapter works on the documented surface, and its limits are stated.
 - **AC-5** CI is green on the public repository.
 

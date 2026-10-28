@@ -87,7 +87,7 @@ dsh plugin --profile <name> add @optcompact/dsh
 dsh --profile <name> --dump-config   # confirm compaction-basic auto:false and the policy row
 ```
 
-The bundle patch works for host-plane profiles (headless, SDK, custom). Web and Desktop mount an isolated compaction group per preset, so they need the preset override described in [`packages/dsh/README.md`](packages/dsh/README.md). A live mount in this deployment is unverified and is the next gate.
+The bundle patch works for host-plane profiles (headless, SDK, custom). A live headless run mounted the plugin, compacted twice, and produced durable checkpoints: [`docs/qa/runs/2026-10-29-live-dsh.md`](docs/qa/runs/2026-10-29-live-dsh.md). Web and Desktop mount an isolated compaction group per preset, so they need the preset override described in [`packages/dsh/README.md`](packages/dsh/README.md).
 
 ## Codex
 
@@ -118,8 +118,9 @@ docs/qa            testing strategy and run evidence
 
 ## Status and limitations
 
-- v0.1.0. The model and both adapters are implemented; the DeepSeek Harness plugin passes contract tests with a fake seam.
-- Live DSH mount and live Codex compaction are unverified in this environment.
+- v0.1.0. The model and both adapters are implemented.
+- The DeepSeek Harness plugin passed a live headless run with two committed compactions.
+- Live Codex compaction is unverified. Web and Desktop DSH presets still need an isolated-group override.
 - Need coverage is not task success. Task-level evaluation is the next gate.
 - Defaults are hypotheses. Calibration per model and summarizer is required before production use.
 

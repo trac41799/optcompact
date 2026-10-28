@@ -48,7 +48,7 @@
 - [x] Run it — verify RED
 - [x] Implement the state builder and the pre-step policy
 - [x] Run it — verify GREEN
-- [ ] Verify tool-pair balance and the keep path on a live session
+- [x] Verify tool-pair balance and the keep path on a live session (headless, two committed compactions)
 - [x] Commit `feat(dsh): model-driven compaction plugin`
 
 ## Task 4: Codex adapter

@@ -19,6 +19,8 @@ Host-plane profiles (headless, SDK, custom) use the bundle patch:
 dsh plugin --profile <name> add @optcompact/dsh
 ```
 
+The package is not on npm yet. Until publication, bundle it to one ESM file and install that directory. The exact steps are in [`docs/qa/runs/2026-10-29-live-dsh.md`](../../docs/qa/runs/2026-10-29-live-dsh.md).
+
 The patch sets `compaction-basic.auto: false` and inserts the policy row. Verify with:
 
 ```bash
@@ -39,9 +41,16 @@ Web and Desktop profiles mount an isolated `compaction` group inside each preset
 | `growthPerTurn` | 2000 | Fallback growth estimate |
 | `params` | core defaults | Model parameter overrides |
 | `onDecision` | none | Receives every decision for evidence |
+| `evidencePath` | none | Appends one JSON line per decision, skip, and committed range |
 
 ## Known limits
 
 - The range walk is local because the backend does not export its selector.
 - Checkpoint generation is not detected yet, so a degraded checkpoint is not protected on this path.
-- The live mount is unverified in this environment. The unit tests use a fake seam that mirrors the measured signatures.
+- Cuts snap to the next `user/message` boundary; a session with one step cannot compact.
+- The live proof ran in a headless profile. Web and Desktop isolate the service per preset.
+
+## Verification
+
+- 8 contract tests with a fake seam.
+- One live headless run with two committed checkpoint transactions ([report](../../docs/qa/runs/2026-10-29-live-dsh.md)).
