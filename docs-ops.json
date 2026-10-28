@@ -1,0 +1,14 @@
+{
+  "rfc_allowlist": [
+    "docs/specs/**",
+    "docs/decisions/**",
+    "docs/standards/**",
+    "docs/architecture/api.md",
+    "docs/CONTRIBUTING.md",
+    "docs/templates/**"
+  ],
+  "procedure_globs": ["AGENTS.md", "docs/plans/**", "docs/*.md", "docs/qa/**"],
+  "sentence_cap": 20,
+  "banned_synonyms": {},
+  "synonym_exempt": []
+}

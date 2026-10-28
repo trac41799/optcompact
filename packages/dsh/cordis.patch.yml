@@ -1,0 +1,21 @@
+# OptCompact host-plane bundle patch.
+
+# Keep the shipped backend as the transaction owner and turn off its fixed
+# pressure trigger. The policy plugin then decides when to compact.
+- id: compaction-basic
+  config:
+    auto: false
+
+- insert:
+    - id: optcompact-policy
+      name: '@optcompact/dsh'
+      config:
+        firstCompactableNode: 1
+        prices:
+          input: 1
+          output: 4
+          fixedCallCost: 20000
+
+# Preset-backed profiles (web, desktop) mount their own isolated compaction
+# group, so this patch does not reach them. See packages/dsh/README.md for the
+# preset override procedure.

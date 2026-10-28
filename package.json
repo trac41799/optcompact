@@ -1,0 +1,23 @@
+{
+  "name": "optcompact",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optimal context-compaction scheduling for coding agents: a rate-distortion and hazard-based decision model, with DeepSeek Harness and Codex adapters.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.29.2",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "test": "pnpm build && node --test \"packages/*/test/*.test.ts\"",
+    "typecheck": "tsc -b tsconfig.json",
+    "build": "tsc -b tsconfig.json",
+    "docs:check": "python ../docs-ops/scripts/check_docs.py --strict --root .",
+    "docs:metrics": "python ../docs-ops/scripts/collect_metrics.py --root ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}
