@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   defaultParams,
+  ewmaGrowth,
+  fitReuseTau,
   unitValue,
   type ContextUnit,
   type PolicyParams
@@ -36,6 +38,21 @@ test('goal units outrank chatter of equal size', () => {
   const goal = unitValue(unit({ type: 'goal' }), 3, params);
   const chatter = unitValue(unit({ type: 'chatter' }), 3, params);
   assert.ok(goal > chatter * 10);
+});
+
+test('fits a reuse decay constant from observed gaps', () => {
+  const tau = fitReuseTau([6, 12, 18]);
+  assert.equal(tau, 12);
+});
+
+test('rejects an empty reuse sample', () => {
+  assert.throws(() => fitReuseTau([]), /sample/);
+});
+
+test('estimates growth as an exponentially weighted mean', () => {
+  const growth = ewmaGrowth([0, 10_000, 0, 10_000], 0.5);
+  assert.ok(growth > 0 && growth < 10_000);
+  assert.equal(ewmaGrowth([], 0.5), 0);
 });
 
 test('finite horizon replaces the infinite sum when beta equals one', () => {

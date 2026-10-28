@@ -11,6 +11,8 @@ This page is the living contract for the core package. Harness adapters MAY depe
 | `decide(state)` | function | Returns a `Decision`; never throws for valid state |
 | `unitValue(unit, turn, params)` | function | Discounted token-equivalent value of one unit |
 | `unitHazard(unit, turn, params)` | function | Per-turn need probability in `[0, 1]` |
+| `fitReuseTau(gaps)` | function | Sample-mean decay constant, at least 1; throws on an empty sample |
+| `ewmaGrowth(deltas, alpha)` | function | Exponentially weighted growth estimate; zero for an empty sample |
 | `summaryFidelity(input)` | function | Value fraction in `[0, 1]`; equals 1 at full retention |
 | `economicInterval(input)` | function | Positive turns; throws on non-positive growth, price, or retention |
 | `extractAnchors(text)` | function | Deduplicated weighted anchors, deterministic order |

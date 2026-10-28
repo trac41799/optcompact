@@ -23,6 +23,8 @@ export type {
 export { DEFAULTS, defaultParams } from './defaults.ts';
 export {
   demandCoefficient,
+  ewmaGrowth,
+  fitReuseTau,
   hazardDecay,
   rederivationCost,
   remainingTurns,

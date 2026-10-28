@@ -18,5 +18,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Test the preset override generator
+        run: node --test scripts/preset-override.test.mjs
       - name: Check relative documentation links
         run: node scripts/check-links.mjs

@@ -307,6 +307,8 @@ The **operating point** is the pair `(k, q)` where `k = 1 − N_after/N_before` 
 
 Identifier recurrence is the key signal. When a later unit mentions a path, symbol, or error from an older unit, the older unit was needed. That event updates `r_i` and the session reuse rate without an LLM call.
 
+`fitReuseTau` and `ewmaGrowth` in `@optcompact/core` implement the `τ` and `g` estimators. Both are pure and tested.
+
 ## 12. Algorithm
 
 ```

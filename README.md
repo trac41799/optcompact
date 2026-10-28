@@ -9,7 +9,7 @@ Fixed pressure thresholds (80% of the window, one global limit) ignore what the 
 - **Model:** reuse hazard × re-derivation cost, Weibull rate-distortion fidelity, prefix-gain scheduling, renewal-reward interval.
 - **Engine:** dependency-free TypeScript, deterministic, no model call on the decision path.
 - **Adapters:** DeepSeek Harness policy plugin, Codex app-server controller and hook parser.
-- **Evidence:** seeded simulator with latent reuse, plus 56 unit, contract, and acceptance tests.
+- **Evidence:** seeded simulator with latent reuse, plus 64 unit, contract, acceptance, and generator tests.
 
 ## Decision in one equation
 
@@ -87,7 +87,9 @@ dsh plugin --profile <name> add @optcompact/dsh
 dsh --profile <name> --dump-config   # confirm compaction-basic auto:false and the policy row
 ```
 
-The bundle patch works for host-plane profiles (headless, SDK, custom). A live headless run mounted the plugin, compacted twice, and produced durable checkpoints: [`docs/qa/runs/2026-10-29-live-dsh.md`](docs/qa/runs/2026-10-29-live-dsh.md). Web and Desktop mount an isolated compaction group per preset, so they need the preset override described in [`packages/dsh/README.md`](packages/dsh/README.md).
+The bundle patch works for host-plane profiles (headless, SDK, custom). A live headless run mounted the plugin, compacted twice, and produced durable checkpoints: [`docs/qa/runs/2026-10-29-live-dsh.md`](docs/qa/runs/2026-10-29-live-dsh.md).
+
+Web and Desktop isolate the compaction service per preset. Generate a preset overlay with `scripts/preset-override.mjs`; the procedure is in [`packages/dsh/PRESET-OVERRIDE.md`](packages/dsh/PRESET-OVERRIDE.md). The overlay is composition-verified on the real `tauri` dump: 8 presets, 8 groups, one policy row each.
 
 ## Codex
 
@@ -118,10 +120,10 @@ docs/qa            testing strategy and run evidence
 
 ## Status and limitations
 
-- v0.1.1. The model and both adapters are implemented.
+- v0.2.0. The model and both adapters are implemented.
 - The DeepSeek Harness plugin passed a live headless run with two committed compactions.
 - The Codex app-server protocol is verified. A full compaction of a populated thread waits on account quota.
-- Web and Desktop DSH presets still need an isolated-group override.
+- Web and Desktop use a generated preset overlay. Composition is verified; a live Web boot was not run in this repository.
 - Need coverage is not task success. Task-level evaluation is the next gate.
 - Defaults are hypotheses. Calibration per model and summarizer is required before production use.
 

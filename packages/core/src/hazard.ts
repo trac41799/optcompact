@@ -49,6 +49,24 @@ export function unitValue(unit: ContextUnit, turn: number, params: PolicyParams)
   );
 }
 
+/**
+ * Fit the reuse decay constant from observed reuse gaps.
+ * The exponential hazard has mean `tau`; the sample mean is its estimator.
+ */
+export function fitReuseTau(gaps: readonly number[]): number {
+  if (gaps.length === 0) throw new Error('fitReuseTau: an empty sample has no estimate');
+  const total = gaps.reduce((sum, gap) => sum + Math.max(0, gap), 0);
+  return Math.max(1, total / gaps.length);
+}
+
+/** Estimate context growth as an exponentially weighted mean of per-turn deltas. */
+export function ewmaGrowth(deltas: readonly number[], alpha: number): number {
+  const weight = Math.min(1, Math.max(0, alpha));
+  let value = 0;
+  for (const delta of deltas) value = weight * delta + (1 - weight) * value;
+  return value;
+}
+
 /** Expected remaining turns used by the carrying-cost term. */
 export function remainingTurns(params: PolicyParams): number {
   if (params.beta < 1) return params.beta / (1 - params.beta);

@@ -27,7 +27,7 @@ The patch sets `compaction-basic.auto: false` and inserts the policy row. Verify
 dsh --profile <name> --dump-config
 ```
 
-Web and Desktop profiles mount an isolated `compaction` group inside each preset. A host-plane insert cannot see that isolated service. Those profiles need the preset configuration restated with the policy row inside the compaction group; that override is not shipped in v0.1.0.
+Web and Desktop profiles mount an isolated `compaction` group inside each preset. A host-plane insert cannot see that isolated service. Use the generator in [`PRESET-OVERRIDE.md`](PRESET-OVERRIDE.md) to restate each preset with the policy row inside its compaction group. The generated overlay is composition-verified on the real `tauri` dump: 8 presets, 8 groups, one policy row each.
 
 ## Configuration
 

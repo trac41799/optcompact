@@ -4,6 +4,14 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-29
+
+### Added
+
+- Preset override generator (`scripts/preset-override.mjs`) for Web and Desktop profiles, with tests and an operator guide. Composition verified on the real `tauri` dump: 8 presets, 8 compaction groups, one policy row each.
+- Calibration estimators `fitReuseTau` and `ewmaGrowth` in `@optcompact/core`.
+- BDD acceptance suite expanded; suite total 59 tests plus 5 generator tests.
+
 ## [0.1.1] — 2026-10-29
 
 ### Added

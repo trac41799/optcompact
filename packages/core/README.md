@@ -12,6 +12,7 @@ import { decide, defaultParams, economicInterval, anchorRetentionScore, extractA
 |---|---|
 | `decide(state)` | Per-turn `Decision` with an additive gain breakdown |
 | `unitValue`, `unitHazard` | Reuse-hazard value model |
+| `fitReuseTau`, `ewmaGrowth` | Calibration estimators for decay and growth |
 | `summaryFidelity` | Rate-distortion fidelity curve with generation penalty |
 | `economicInterval` | Renewal-reward interval `sqrt(2c0/(λρg))` |
 | `extractAnchors`, `anchorRetentionScore` | Retained-quality measurement |
