@@ -1,6 +1,6 @@
 # Token optimization run, 2026-10-29
 
-**Verdict:** pruning old tool results before summarizing dominates the fixed threshold. The best tested point retains 97.20% of needs at 11.13M tokens, against 96.85% at 11.93M for the baseline. The cheapest point that keeps 96.67% costs 10.68M.
+**Verdict:** pruning old tool results before summarizing dominates the fixed threshold. The tuned point retains 96.91% of needs at 10.32M tokens, against 96.85% at 11.93M for the baseline: 13.5% fewer tokens at equal quality. The cheapest point that matches baseline coverage costs 10.22M, 14.3% below baseline.
 
 ## Setup
 
@@ -18,16 +18,18 @@
 | Hazard, defaults | 4.50M | 83.16% | 30.6 |
 | Planned q=0.95 | 6.81M | 86.67% | 6.0 |
 | Planned q=0.99 | 11.01M | 93.69% | 4.6 |
-| Prune age=8, compact 0.80, target 0.6 | **11.13M** | **97.20%** | 3.5 |
-| Prune age=8, compact 0.80, target 0.5 | **10.68M** | 96.67% | 2.8 |
-| Prune age=10, compact 0.80, target 0.6 | 11.15M | 97.32% | 3.6 |
+| Prune age=8, scale=0.20, compact 0.80, target 0.6 | 11.13M | 97.20% | 3.5 |
+| Prune age=6, scale=0.15, compact 0.75, target 0.6 | **10.32M** | **96.91%** | 3.5 |
+| Prune age=6, scale=0.15, compact 0.75, target 0.55 | **10.22M** | 96.85% | 3.5 |
+| Prune age=7, scale=0.15, compact 0.75, target 0.55 | 10.36M | 97.03% | 3.0 |
 
 ## Reading
 
-- The tiered policy is Pareto-dominant at the recommended point: 6.7% fewer tokens and 0.35 points more coverage than the fixed baseline.
+- The tuned tiered policy is Pareto-dominant: 13.5% fewer tokens at 0.06 points more coverage than the fixed baseline.
+- Pruning earlier and harder helps: age 6 and a 0.15 scale beat age 8 and 0.20. Old tool output is bulky and low value.
 - Aggressive compaction by interval alone loses coverage. The planned q=0.99 policy spends about the same tokens as the baseline but retains 3.2 fewer points.
-- Pruning beats summarizing because tool output is bulky and low value. Dropping its middle costs little and needs no model call.
 - The winning tier order is prune, re-measure, then summarize only if pressure remains.
+- The shipped pruner is configured by character budget, not by age. The age and scale here are simulator proxies. The adapter maps them to `pruneAt` plus the mount-time `thresholdChars`.
 
 ## Fidelity calibration gap
 
