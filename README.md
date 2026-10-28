@@ -1,5 +1,7 @@
 # OptCompact
 
+[![CI](https://github.com/trac41799/optcompact/actions/workflows/ci.yml/badge.svg)](https://github.com/trac41799/optcompact/actions/workflows/ci.yml)
+
 **Compact a coding-agent session when the value of carrying context falls below the cost of losing it.**
 
 Fixed pressure thresholds (80% of the window, one global limit) ignore what the old context is worth, what the summary costs, and how much fidelity the summarizer loses. OptCompact computes a per-turn decision from observable signals and reports every term in token-equivalents, so the decision is auditable.
