@@ -31,37 +31,37 @@
 **Files:** `packages/sim/src/generator.ts`, `packages/sim/src/policies.ts`, `packages/sim/src/runner.ts`, `packages/sim/test/*.test.ts`
 **Interfaces:** `generateSession(seed, options) -> SimSession`, `runPolicy(policy, session) -> SimResult`
 
-- [ ] Write a failing test that a never-compact policy overflows its window
+- [x] Write a failing test that a never-compact policy overflows its window
 - [ ] Run it — verify RED
-- [ ] Implement the generator and the runner
+- [x] Implement the generator and the runner
 - [ ] Run it — verify GREEN
-- [ ] Add the fixed-threshold and periodic baselines
-- [ ] Produce the policy comparison table for the README
-- [ ] Commit `feat(sim): seeded ground-truth policy comparison`
+- [x] Add the fixed-threshold and periodic baselines
+- [x] Produce the policy comparison table for the README
+- [x] Commit `feat(sim): seeded ground-truth policy comparison`
 
 ## Task 3: DeepSeek Harness adapter
 
-**Files:** `packages/dsh/src/index.ts`, `packages/dsh/src/state.ts`, `packages/dsh/test/*.test.ts`
-**Interfaces:** `class OptCompactEngine extends BasicCompactionEngine`, `buildPolicyState(measurement, session, config) -> PolicyState`
+**Files:** `packages/dsh/src/index.ts`, `packages/dsh/cordis.patch.yml`, `packages/dsh/test/*.test.ts`
+**Interfaces:** `maybeCompact(ctx, config, agent, turn, signal) -> Decision`, `install(ctx, config) -> dispose`
 
-- [ ] Write a failing contract test with a fake compaction seam
-- [ ] Run it — verify RED
-- [ ] Implement the state builder and the `compactIfNeeded` override
-- [ ] Run it — verify GREEN
+- [x] Write a failing contract test with a fake compaction seam
+- [x] Run it — verify RED
+- [x] Implement the state builder and the pre-step policy
+- [x] Run it — verify GREEN
 - [ ] Verify tool-pair balance and the keep path on a live session
-- [ ] Commit `feat(dsh): model-driven compaction backend`
+- [x] Commit `feat(dsh): model-driven compaction plugin`
 
 ## Task 4: Codex adapter
 
 **Files:** `packages/codex/src/index.ts`, `packages/codex/src/*.ts`, `packages/codex/test/*.test.ts`
 **Interfaces:** documented in `docs/specs/codex-adapter.md`
 
-- [ ] Write a failing test for the Codex event mapping
-- [ ] Run it — verify RED
-- [ ] Implement the adapter against the supported Codex surface
-- [ ] Run it — verify GREEN
-- [ ] Record the supported and unsupported signals in the spec
-- [ ] Commit `feat(codex): optimal-compaction adapter`
+- [x] Write a failing test for the Codex event mapping
+- [x] Run it — verify RED
+- [x] Implement the adapter against the supported Codex surface
+- [x] Run it — verify GREEN
+- [x] Record the supported and unsupported signals in the spec
+- [x] Commit `feat(codex): optimal-compaction adapter`
 
 ## Task 5: CLI and examples
 
@@ -79,11 +79,11 @@
 
 **Files:** `.github/workflows/ci.yml`, `README.md`, `docs/changes/CHANGELOG.md`
 
-- [ ] Add CI: install, test, typecheck, docs gate
-- [ ] Verify CI green on the remote
-- [ ] Tag `v0.1.0` and publish the GitHub release
-- [ ] Confirm the repository is public and the README renders the evidence table
-- [ ] Commit `chore(release): v0.1.0`
+- [x] Add CI: install, test, typecheck, link check
+- [x] Verify CI green on the remote (run 40734190220)
+- [x] Tag `v0.1.0` and publish the GitHub release
+- [x] Confirm the repository is public and the README renders the evidence table
+- [x] Commit `chore(release): v0.1.0`
 
 ---
 
