@@ -8,11 +8,11 @@ The model optimized one decision: summarize a prefix or keep it. A simulator com
 
 Measured on 20 synthetic sessions:
 
-- fixed 0.80 threshold: 11.93M tokens, 96.85% need coverage;
-- prune old tool results, then compact at 0.75 to target 0.6: 10.32M tokens, 96.91% coverage;
-- prune, then compact to target 0.55: 10.22M tokens, 96.85% coverage.
+- fixed 0.80 threshold: 12.75M tokens, 96.85% need coverage;
+- prune old tool results, then compact at 0.75 to target 0.6: 10.96M tokens, 96.91% coverage;
+- prune, then compact to target 0.55: 10.89M tokens, 96.85% coverage.
 
-Pruning is Pareto-dominant: 13.5% fewer tokens at equal or better coverage.
+Pruning is Pareto-dominant: 14.0% fewer tokens at equal or better coverage.
 
 ## Decision
 

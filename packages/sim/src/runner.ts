@@ -71,6 +71,7 @@ export function simulatePolicy(
   let checkpointFidelity = 1;
   let contextTokens = 0;
   let tokensSpent = 0;
+  let summaryTokens = 0;
   let reworkTokens = 0;
   let needs = 0;
   let satisfied = 0;
@@ -182,8 +183,10 @@ export function simulatePolicy(
         for (const [id, value] of fidelity) {
           if (!live.get(id) && !shadowedIds.has(id)) fidelity.set(id, value * spanFidelity);
         }
-        checkpointTokens = retentionRatio * (checkpointTokens + span);
+        summaryTokens += span + 4 * retentionRatio * span;
+      checkpointTokens = retentionRatio * (checkpointTokens + span);
       } else {
+        summaryTokens += span + 4 * retentionRatio * span;
         checkpointTokens += retentionRatio * span;
       }
       let weighted = 0;
@@ -235,7 +238,9 @@ export function simulatePolicy(
   return {
     policy,
     tokensSpent,
+    summaryTokens,
     reworkTokens,
+    totalTokens: tokensSpent + summaryTokens + reworkTokens,
     needs,
     satisfied,
     lost,

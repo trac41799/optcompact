@@ -407,7 +407,7 @@ Cheap, model-free reductions run before model-written summaries:
 2. re-measure the surface;
 3. summarize only if the post-prune gain stays positive.
 
-Pruning dominates at the recommended point: 10.32M tokens at 96.91% coverage against 11.93M at 96.85% for a fixed threshold. Evidence: [token optimization run](../qa/runs/2026-10-29-token-optimization.md).
+Pruning dominates at the recommended point: 10.96M tokens at 96.91% coverage against 12.75M at 96.85% for a fixed threshold. Evidence: [token optimization run](../qa/runs/2026-10-29-token-optimization.md).
 
 ## 20. Simulation evidence
 

@@ -34,12 +34,12 @@ Compact the oldest prefix when its summed gain clears the gate. `V_i` is a disco
 | Periodic 15 turns | 12.94M | 96.9% | 7.7 |
 | **OptCompact (default)** | **4.50M** | **83.2%** | 30.6 |
 | OptCompact (quality floor 0.95) | 12.16M | 95.0% | 15.2 |
-| **Prune old tool results, then compact** | **10.32M** | **96.9%** | 3.5 |
+| **Prune old tool results, then compact** | **10.96M** | **96.9%** | 3.5 |
 | Prune, compact harder (lowest at ≥96.6%) | 10.68M | 96.7% | 2.8 |
 
 The result is a frontier, not a single number. Default settings trade 13.7 points of need coverage for a 62% token reduction. The quality-first profile recovers coverage at no token advantage over the fixed baseline.
 
-The v0.3.0 tiered policy dominates the fixed baseline at the high-quality end: pruning old tool results before summarizing retains 96.9% of needs at 10.32M tokens, against 96.9% at 11.93M. Method and threats to validity: [`docs/qa/runs/2026-10-29-token-optimization.md`](docs/qa/runs/2026-10-29-token-optimization.md).
+The v0.3.0 tiered policy dominates the fixed baseline at the high-quality end: pruning old tool results before summarizing consumes 10.96M tokens at 96.9% coverage against 12.75M at 96.9%. Method and threats to validity: [`docs/qa/runs/2026-10-29-token-optimization.md`](docs/qa/runs/2026-10-29-token-optimization.md).
 
 ## Packages
 

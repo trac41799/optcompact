@@ -15,7 +15,7 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- Recommended high-quality configuration: prune old tool results, compact at 0.75. Measured 10.32M tokens at 96.91% need coverage versus 11.93M at 96.85% for the fixed baseline: 13.5% fewer tokens at equal quality.
+- Recommended high-quality configuration: prune old tool results, compact at 0.75. Measured 10.96M consumed tokens at 96.91% need coverage versus 12.75M at 96.85% for the fixed baseline: 14.0% fewer tokens at equal quality.
 
 ### Verified
 

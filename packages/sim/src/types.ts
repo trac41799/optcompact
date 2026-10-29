@@ -38,7 +38,9 @@ export type PolicyName = 'never' | 'fixed' | 'periodic' | 'hazard' | 'planned' |
 export interface SimResult {
   policy: PolicyName;
   tokensSpent: number;
+  summaryTokens: number;
   reworkTokens: number;
+  totalTokens: number;
   needs: number;
   satisfied: number;
   lost: number;
