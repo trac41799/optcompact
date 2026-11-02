@@ -7,7 +7,16 @@
  * @module
  */
 import { appendFileSync } from 'node:fs';
-import { decide, defaultParams, type ContextUnit, type Decision, type PolicyParams, type PolicyState } from '@optcompact/core';
+import {
+  decide,
+  decideCheckpoint,
+  defaultParams,
+  type CheckpointDecision,
+  type ContextUnit,
+  type Decision,
+  type PolicyParams,
+  type PolicyState
+} from '@optcompact/core';
 
 /** One token-priced surface node, structural subset of `TokenSurfaceNode`. */
 export interface DshNode {
@@ -88,7 +97,21 @@ export interface DshConfig {
   prune?: boolean;
   /** Load fraction at which pruning runs. Defaults to 0.45. */
   pruneAt?: number;
+  /** Decision mode. Checkpoint is the default; gain keeps the v0.3 optimizer. */
+  mode?: 'checkpoint' | 'gain';
+  /** Occupancy ceiling for a boundary checkpoint. Defaults to 0.5. */
+  maxOccupancy?: number;
+  /** Occupancy that forces a checkpoint without a boundary. Defaults to 0.75. */
+  urgentOccupancy?: number;
+  /** Occupancy that forces an immediate checkpoint. Defaults to 0.9. */
+  hardOccupancy?: number;
+  /** Surface nodes kept verbatim after a checkpoint. Defaults to 4. */
+  tailNodes?: number;
+  /** Checkpoint budget used for the ratio estimate. Defaults to 1500. */
+  checkpointTokens?: number;
 }
+
+const lastCheckpointTurn = new WeakMap<DshSession, number>();
 
 interface PrunerService {
   pruneSession(session: DshSession): unknown;
@@ -305,6 +328,132 @@ export async function maybeCompact(
   return decision;
 }
 
+/**
+ * Boundary checkpoint mode: compact at the first task boundary after occupancy
+ * reaches the ceiling, keep a short verbatim tail, and target a small
+ * checkpoint budget.
+ */
+export async function maybeCheckpoint(
+  ctx: DshContext,
+  config: DshConfig,
+  agent: DshAgent,
+  turn: number,
+  signal: AbortSignal
+): Promise<CheckpointDecision | null> {
+  if (signal.aborted) {
+    recordSkip(config.evidencePath, turn, 'aborted');
+    return null;
+  }
+  const header = agent.session.requestHeader?.()?.config;
+  const target = header?.provider && header.model ? header : agent.options;
+  if (!target?.provider || !target?.model) {
+    recordSkip(config.evidencePath, turn, 'no-target');
+    return null;
+  }
+
+  const info = await ctx.llm.resolveModelInfo(target.provider, target.model, signal);
+  if (signal.aborted) {
+    recordSkip(config.evidencePath, turn, 'aborted');
+    return null;
+  }
+  if (!info.context) {
+    recordSkip(config.evidencePath, turn, 'no-window');
+    return null;
+  }
+
+  let measurement = ctx.tokenMeter.measure(agent.session);
+  let pruned = false;
+  const windowTokens = info.context.contextWindow;
+  const pruneAt = config.pruneAt ?? 0.45;
+  if (config.prune !== false && (measurement.surfaceTokens || measurement.totalTokens) / windowTokens >= pruneAt) {
+    const pruner = optionalPruner(ctx);
+    if (pruner) {
+      try {
+        pruner.pruneSession(agent.session);
+        measurement = ctx.tokenMeter.measure(agent.session);
+        pruned = true;
+      } catch (error) {
+        ctx.logger.warn(`optcompact: prune failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  const contextTokens = measurement.surfaceTokens || measurement.totalTokens;
+  const boundary = lastCheckpointTurn.get(agent.session) !== turn;
+  lastCheckpointTurn.set(agent.session, turn);
+  const occupancy = contextTokens / windowTokens;
+  const { units, seqs } = buildUnits(measurement, turn, config.firstCompactableNode ?? 1);
+
+  const tailNodes = Math.max(1, config.tailNodes ?? 4);
+  let cut = Math.max(0, units.length - tailNodes);
+  const tailTokens = units.slice(cut).reduce((sum, unit) => sum + Math.max(0, unit.tokens), 0);
+  const decision = decideCheckpoint({
+    occupancy,
+    atBoundary: boundary,
+    contextTokens,
+    windowTokens,
+    checkpointTokens: config.checkpointTokens ?? 1_500,
+    tailTokens,
+    maxOccupancy: config.maxOccupancy ?? 0.5,
+    urgentOccupancy: config.urgentOccupancy ?? 0.75,
+    hardOccupancy: config.hardOccupancy ?? 0.9
+  });
+  writeEvidence(config.evidencePath ?? '', {
+    mode: 'checkpoint',
+    turn,
+    occupancy,
+    boundary,
+    pruned,
+    ...decision
+  });
+
+  if (decision.action !== 'checkpoint') return decision;
+  if (cut < 1 || cut >= units.length) {
+    recordSkip(config.evidencePath, turn, 'insufficient-units');
+    return null;
+  }
+  if (agent.session.eventAt) {
+    const typeOf = (seq: number): string | undefined => agent.session.eventAt?.(seq)?.type;
+    cut = snapCutToStep(seqs, cut, typeOf);
+    if (cut === 0) {
+      recordSkip(config.evidencePath, turn, 'no-step-boundary');
+      return null;
+    }
+  }
+  const startSeq = seqs[0];
+  const endSeq = seqs[cut - 1];
+  if (startSeq === undefined || endSeq === undefined) return null;
+
+  await ctx.compaction.compactRegion(startSeq, endSeq, agent, signal);
+  lastCompaction.set(agent.session, turn);
+  let actual = decision;
+  try {
+    const after = ctx.tokenMeter.measure(agent.session);
+    const afterTokens = after.surfaceTokens || after.totalTokens;
+    actual = {
+      ...decision,
+      postTokens: afterTokens,
+      ratio: contextTokens > 0 ? 1 - afterTokens / contextTokens : 0,
+      targetOccupancy: afterTokens / windowTokens
+    };
+  } catch {
+    // Keep the estimate when the meter cannot re-measure.
+  }
+  writeEvidence(config.evidencePath ?? '', {
+    mode: 'checkpoint',
+    turn,
+    action: 'compacted',
+    cutIndex: cut,
+    startSeq,
+    endSeq,
+    tailTokens,
+    postTokens: actual.postTokens,
+    ratio: actual.ratio,
+    targetOccupancy: actual.targetOccupancy
+  });
+  return actual;
+}
+
 /** Register the plugin handlers; returns a disposer. */
 export function install(ctx: DshContext, config: DshConfig = {}): () => void {
   const disposers: unknown[] = [];
@@ -316,7 +465,8 @@ export function install(ctx: DshContext, config: DshConfig = {}): () => void {
     ctx.on('agent/pre-step', async (payload: unknown, next: () => Promise<unknown>) => {
       const { agent, turn, signal } = payload as { agent: DshAgent; turn: number; signal: AbortSignal };
       try {
-        await maybeCompact(ctx, config, agent, turn, signal);
+        if ((config.mode ?? 'checkpoint') === 'gain') await maybeCompact(ctx, config, agent, turn, signal);
+        else await maybeCheckpoint(ctx, config, agent, turn, signal);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         recordSkip(config.evidencePath, turn, `error:${message}`);

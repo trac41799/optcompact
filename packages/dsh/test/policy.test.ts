@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { install, maybeCompact, snapCutToStep, type DshAgent, type DshContext } from '../src/index.ts';
+import { install, maybeCheckpoint, maybeCompact, snapCutToStep, type DshAgent, type DshContext } from '../src/index.ts';
 
 function makeContext(overrides: Record<string, unknown> = {}) {
   const calls: Array<{ start: number; end: number }> = [];
@@ -95,6 +95,74 @@ test('never lets a decision error escape', async () => {
     }
   });
   await assert.rejects(() => maybeCompact(ctx, {}, makeAgent(), 3, new AbortController().signal));
+});
+
+function meter(nodes: Array<[number, number]>) {
+  let total = 0;
+  const mapped = nodes.map(([seq, tokens]) => {
+    total += tokens;
+    return { seq, tokens, heuristicTokens: tokens };
+  });
+  return { totalTokens: total, surfaceTokens: total, nodes: mapped };
+}
+
+test('checkpoints at a turn boundary once occupancy reaches 50%', async () => {
+  const { ctx, calls } = makeContext();
+  let compacted = false;
+  ctx.tokenMeter.measure = () =>
+    compacted
+      ? meter([[40, 5_000]])
+      : meter([[0, 5_000], [10, 40_000], [20, 40_000], [30, 10_000], [40, 5_000]]);
+  const originalCompact = ctx.compaction.compactRegion;
+  ctx.compaction.compactRegion = async (start: number, end: number) => {
+    await originalCompact(start, end, makeAgent(), new AbortController().signal);
+    compacted = true;
+  };
+  ctx.llm.resolveModelInfo = async () => ({ context: { contextWindow: 200_000 }, defaultMaxTokens: 8_000 });
+  const decision = await maybeCheckpoint(
+    ctx,
+    { tailNodes: 1, checkpointTokens: 1_500, maxOccupancy: 0.5 },
+    makeAgent(),
+    30,
+    new AbortController().signal
+  );
+  assert.equal(decision?.action, 'checkpoint');
+  assert.equal(decision?.reason, 'boundary');
+  assert.ok((decision?.ratio ?? 0) > 0.9);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.start, 10);
+  assert.equal(calls[0]?.end, 30);
+});
+
+test('waits for a boundary within the same turn', async () => {
+  const { ctx, calls } = makeContext();
+  ctx.tokenMeter.measure = () => meter([[0, 5_000], [10, 20_000], [20, 20_000], [30, 10_000], [40, 5_000]]);
+  const agent = makeAgent();
+  await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 30, new AbortController().signal);
+  const second = await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 30, new AbortController().signal);
+  assert.equal(second?.action, 'keep');
+  assert.equal(second?.reason, 'no-boundary');
+  assert.equal(calls.length, 1);
+});
+
+test('checkpoints without a boundary above urgent occupancy', async () => {
+  const { ctx, calls } = makeContext();
+  ctx.tokenMeter.measure = () => meter([[0, 5_000], [10, 30_000], [20, 30_000], [30, 20_000]]);
+  const agent = makeAgent();
+  await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 31, new AbortController().signal);
+  const second = await maybeCheckpoint(ctx, { tailNodes: 1, urgentOccupancy: 0.7 }, agent, 31, new AbortController().signal);
+  assert.equal(second?.action, 'checkpoint');
+  assert.equal(second?.reason, 'urgency');
+  assert.equal(calls.length, 2);
+});
+
+test('keeps below the occupancy ceiling', async () => {
+  const { ctx, calls } = makeContext();
+  ctx.tokenMeter.measure = () => meter([[0, 30_000], [10, 5_000], [20, 5_000]]);
+  const decision = await maybeCheckpoint(ctx, { tailNodes: 2 }, makeAgent(), 30, new AbortController().signal);
+  assert.equal(decision?.action, 'keep');
+  assert.equal(decision?.reason, 'below-threshold');
+  assert.equal(calls.length, 0);
 });
 
 test('prunes tool results before deciding when load is high', async () => {

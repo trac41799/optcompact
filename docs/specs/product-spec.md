@@ -51,6 +51,7 @@ The engine is a pure function over `PolicyState`. Adapters map harness events to
 | Anchor retention metric | Delivered | `packages/core/test/metrics.test.ts` |
 | Simulator and baselines | Delivered | `packages/sim`, `docs/qa/runs/2026-10-29-simulation.md` |
 | DeepSeek Harness adapter | Delivered and live-verified in a headless profile | `packages/dsh/test/policy.test.ts`, [live run](../qa/runs/2026-10-29-live-dsh.md) |
+| Boundary checkpoint mode | Delivered; 88% per-event reduction, 8.6% post occupancy | [checkpoint run](../qa/runs/2026-11-02-checkpoint-mode.md) |
 | Codex adapter | Delivered; protocol verified, full compaction pending quota | `packages/codex/test/*.test.ts`, [protocol check](../qa/runs/2026-10-29-codex-protocol.md) |
 | CLI | Deferred | not needed for v0.1 |
 | CI and public release | In progress | Task 6 |

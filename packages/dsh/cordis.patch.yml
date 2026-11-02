@@ -5,6 +5,7 @@
 - id: compaction-basic
   config:
     auto: false
+    maxTokens: 1600
 
 - insert:
     - id: optcompact-policy

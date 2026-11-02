@@ -14,6 +14,8 @@ export interface SimUnit {
   baseHazard: number;
   /** True re-derivation cost multiplier. */
   costMultiplier: number;
+  /** True for goal, decision, error, and file units that must survive. */
+  critical: boolean;
 }
 
 export interface SimConfig {
@@ -33,7 +35,7 @@ export interface SimSession {
   units: SimUnit[];
 }
 
-export type PolicyName = 'never' | 'fixed' | 'periodic' | 'hazard' | 'planned' | 'prune';
+export type PolicyName = 'never' | 'fixed' | 'periodic' | 'hazard' | 'planned' | 'prune' | 'checkpoint';
 
 export interface SimResult {
   policy: PolicyName;
@@ -46,6 +48,10 @@ export interface SimResult {
   lost: number;
   compactions: number;
   overflowTurns: number;
+  avgCompactionRatio: number;
+  avgPostOccupancy: number;
+  criticalNeeds: number;
+  criticalSatisfied: number;
   maxContextTokens: number;
   avgContextTokens: number;
   finalContextTokens: number;
@@ -74,4 +80,10 @@ export interface SimOptions {
   pruneMinTokens?: number;
   /** Prune policy: load at which pruning starts. */
   pruneLoad?: number;
+  /** Checkpoint policy: turns between phase boundaries. */
+  phaseTurns?: number;
+  /** Checkpoint policy: recent turns kept verbatim. */
+  tailTurns?: number;
+  /** Checkpoint policy: written checkpoint budget. */
+  checkpointTokens?: number;
 }

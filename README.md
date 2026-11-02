@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/trac41799/optcompact/actions/workflows/ci.yml/badge.svg)](https://github.com/trac41799/optcompact/actions/workflows/ci.yml)
 
-**Compact a coding-agent session when the value of carrying context falls below the cost of losing it.**
+**Distill context at task boundaries: one checkpoint removes 88% of the window and keeps 99.6% of critical context.**
 
-Fixed pressure thresholds (80% of the window, one global limit) ignore what the old context is worth, what the summary costs, and how much fidelity the summarizer loses. OptCompact computes a per-turn decision from observable signals and reports every term in token-equivalents, so the decision is auditable.
+Fixed pressure thresholds (80% of the window, one global limit) trim rather than distill. OptCompact triggers at 50% occupancy on a task boundary, replaces history with a bounded structured checkpoint, keeps a short verbatim tail, and reports the measured per-event reduction and post-compaction footprint.
 
-- **Model:** reuse hazard × re-derivation cost, Weibull rate-distortion fidelity, prefix-gain scheduling, renewal-reward interval.
+- **Model:** reuse hazard × re-derivation cost, rate-distortion fidelity, boundary checkpoints, prefix-gain scheduling, renewal-reward interval.
 - **Engine:** dependency-free TypeScript, deterministic, no model call on the decision path.
-- **Adapters:** DeepSeek Harness policy plugin, Codex app-server controller and hook parser.
-- **Evidence:** seeded simulator with latent reuse, plus 64 unit, contract, acceptance, and generator tests.
+- **Adapters:** DeepSeek Harness policy plugin (checkpoint mode default), Codex app-server controller and hook parser.
+- **Evidence:** seeded simulator with latent reuse and critical units, plus 85 unit, contract, acceptance, and generator tests.
 
 ## Decision in one equation
 
@@ -23,23 +23,23 @@ G_i = λ·L·s_i·(1−ρ)                    tokens saved by not carrying the u
 
 Compact the oldest prefix when its summed gain clears the gate. `V_i` is a discounted reuse-hazard value, `φ_i` is a rate-distortion fidelity curve, and `Λ` prices quality loss above raw re-derivation. Full derivation: [`docs/specs/compaction-model.md`](docs/specs/compaction-model.md).
 
-## Simulated results
+## Measured results
 
-20 seeded 100-turn sessions, 200k window, latent reuse hidden from the policy:
+20 seeded 100-turn sessions with critical units tracked separately. Two different numbers matter:
 
-| Policy | Tokens | Need coverage | Compactions |
-|---|---|---|---|
-| Never compact | 13.54M | 97.4% | 5.3 |
-| Fixed 80% threshold | 11.93M | 96.9% | 9.8 |
-| Periodic 15 turns | 12.94M | 96.9% | 7.7 |
-| **OptCompact (default)** | **4.50M** | **83.2%** | 30.6 |
-| OptCompact (quality floor 0.95) | 12.16M | 95.0% | 15.2 |
-| **Prune old tool results, then compact** | **10.96M** | **96.9%** | 3.5 |
-| Prune, compact harder (lowest at ≥96.6%) | 10.68M | 96.7% | 2.8 |
+- **Per-event reduction**: how much one compaction removes, `1 - post/pre`.
+- **Post occupancy**: context size after the checkpoint, as a fraction of the window.
 
-The result is a frontier, not a single number. Default settings trade 13.7 points of need coverage for a 62% token reduction. The quality-first profile recovers coverage at no token advantage over the fixed baseline.
+| Policy | Total tokens | Per-event reduction | Post occupancy | Critical recall | All-need coverage |
+|---|---|---|---|---|---|
+| Fixed 80% threshold | 12.75M | 30% | 58.3% | 97.1% | 96.8% |
+| Prune + compact | 10.96M | 19% | 62.8% | 99.8% | 96.9% |
+| **Boundary checkpoint at 50%** | **8.16M** | **88%** | **8.6%** | **99.6%** | **90.6%** |
+| Checkpoint at 40%, 1000-token budget | 7.40M | 94% | 4.7% | 99.3% | 89.0% |
 
-The v0.3.0 tiered policy dominates the fixed baseline at the high-quality end: pruning old tool results before summarizing consumes 10.96M tokens at 96.9% coverage against 12.75M at 96.9%. Method and threats to validity: [`docs/qa/runs/2026-10-29-token-optimization.md`](docs/qa/runs/2026-10-29-token-optimization.md).
+The earlier "14%" was session-total token savings against a baseline, not the compaction ratio. The default checkpoint mode now removes 88% of the context per event, leaves 8.6% of the window, and retains 99.6% of critical context. All-need coverage falls because bulk tool detail is deliberately discarded.
+
+Method and threats to validity: [`docs/qa/runs/2026-11-02-checkpoint-mode.md`](docs/qa/runs/2026-11-02-checkpoint-mode.md).
 
 ## Packages
 

@@ -82,6 +82,11 @@ export function simulatePolicy(
   let inputTokens = 0;
   let lastCompactionTurn: number | undefined;
   let planned: ReturnType<typeof planSchedule> | undefined;
+  let ratioSum = 0;
+  let ratioCount = 0;
+  let postOccupancySum = 0;
+  let criticalNeeds = 0;
+  let criticalSatisfied = 0;
 
   for (let turn = 1; turn <= session.turns; turn += 1) {
     const all = allowedUnits(session, turn);
@@ -163,6 +168,15 @@ export function simulatePolicy(
           sizeOf
         );
       }
+    } else if (policy === 'checkpoint') {
+      const phaseTurns = options.phaseTurns ?? 25;
+      const boundary = turn % phaseTurns === 0;
+      const occupancy = contextTokens / session.windowTokens;
+      if ((occupancy >= 0.5 && boundary) || occupancy >= 0.75) {
+        const tailTurns = options.tailTurns ?? 2;
+        const firstTail = liveUnits.findIndex((u) => u.createdTurn > turn - tailTurns);
+        cut = firstTail > 0 ? firstTail : 0;
+      }
     }
 
     if (contextTokens > session.windowTokens) {
@@ -171,23 +185,34 @@ export function simulatePolicy(
     }
 
     if (cut > 0) {
+      const beforeContext = contextTokens;
       const shadowed = liveUnits.slice(0, cut);
       const shadowedIds = new Set(shadowed.map((u) => u.id));
       const span = shadowed.reduce((sum, u) => sum + u.tokens, 0);
       const spanFidelity = trueFidelity(shadowed[0]?.type ?? 'tool', retentionRatio, span);
-      for (const u of shadowed) {
-        live.set(u.id, false);
-        fidelity.set(u.id, trueFidelity(u.type, retentionRatio, span));
-      }
-      if (includeCheckpoint) {
-        for (const [id, value] of fidelity) {
-          if (!live.get(id) && !shadowedIds.has(id)) fidelity.set(id, value * spanFidelity);
+      if (policy === 'checkpoint') {
+        const budget = options.checkpointTokens ?? 1_500;
+        for (const u of shadowed) {
+          live.set(u.id, false);
+          fidelity.set(u.id, u.critical ? 0.98 : 0.3);
         }
-        summaryTokens += span + 4 * retentionRatio * span;
-      checkpointTokens = retentionRatio * (checkpointTokens + span);
+        summaryTokens += span + 4 * budget;
+        checkpointTokens = budget;
       } else {
-        summaryTokens += span + 4 * retentionRatio * span;
-        checkpointTokens += retentionRatio * span;
+        for (const u of shadowed) {
+          live.set(u.id, false);
+          fidelity.set(u.id, trueFidelity(u.type, retentionRatio, span));
+        }
+        if (includeCheckpoint) {
+          for (const [id, value] of fidelity) {
+            if (!live.get(id) && !shadowedIds.has(id)) fidelity.set(id, value * spanFidelity);
+          }
+          summaryTokens += span + 4 * retentionRatio * span;
+          checkpointTokens = retentionRatio * (checkpointTokens + span);
+        } else {
+          summaryTokens += span + 4 * retentionRatio * span;
+          checkpointTokens += retentionRatio * span;
+        }
       }
       let weighted = 0;
       let weight = 0;
@@ -201,6 +226,11 @@ export function simulatePolicy(
       lastCompactionTurn = turn;
       const remaining = all.filter((u) => live.get(u.id));
       contextTokens = checkpointTokens + remaining.reduce((sum, u) => sum + sizeOf(u), 0);
+      if (contextTokens < beforeContext) {
+        ratioSum += 1 - contextTokens / beforeContext;
+        ratioCount += 1;
+        postOccupancySum += contextTokens / session.windowTokens;
+      }
     }
 
     maxContextTokens = Math.max(maxContextTokens, contextTokens);
@@ -211,6 +241,7 @@ export function simulatePolicy(
       const need = u.baseHazard * Math.exp(-(turn - u.createdTurn) / tau);
       if (hashUnit(session.seed, turn, unitIndex.get(u.id) ?? 0) >= need) continue;
       needs += 1;
+      if (u.critical) criticalNeeds += 1;
       lastNeed.set(u.id, turn);
       if (live.get(u.id)) {
         if ((scale.get(u.id) ?? 1) < 1) {
@@ -222,11 +253,14 @@ export function simulatePolicy(
           }
         }
         satisfied += 1;
+        if (u.critical) criticalSatisfied += 1;
         continue;
       }
       const preserved = hashUnit(session.seed ^ 0x5f3759df, turn, unitIndex.get(u.id) ?? 0);
-      if (preserved < (fidelity.get(u.id) ?? 0)) satisfied += 1;
-      else {
+      if (preserved < (fidelity.get(u.id) ?? 0)) {
+        satisfied += 1;
+        if (u.critical) criticalSatisfied += 1;
+      } else {
         lost += 1;
         reworkTokens += u.costMultiplier * u.tokens;
       }
@@ -246,6 +280,10 @@ export function simulatePolicy(
     lost,
     compactions,
     overflowTurns,
+    avgCompactionRatio: ratioCount > 0 ? ratioSum / ratioCount : 0,
+    avgPostOccupancy: ratioCount > 0 ? postOccupancySum / ratioCount : 0,
+    criticalNeeds,
+    criticalSatisfied,
     maxContextTokens,
     avgContextTokens: session.turns > 0 ? inputTokens / session.turns : 0,
     finalContextTokens: contextTokens

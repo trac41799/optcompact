@@ -53,7 +53,8 @@ function unit(type: SimUnitType, tokens: number, turn: number, index: number): S
     tokens: Math.round(tokens),
     createdTurn: turn,
     baseHazard: TRUE_HAZARD[type],
-    costMultiplier: TRUE_COST[type]
+    costMultiplier: TRUE_COST[type],
+    critical: type === 'goal' || type === 'decision' || type === 'error' || type === 'file'
   };
 }
 

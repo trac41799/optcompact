@@ -50,6 +50,7 @@ test('injects the policy row into every preset compaction group', () => {
   assert.equal(result.changed, 2);
   assert.equal((result.text.match(/- id: optcompact-policy/g) ?? []).length, 2);
   assert.equal((result.text.match(/auto: false/g) ?? []).length, 2);
+  assert.equal((result.text.match(/maxTokens: 1600/g) ?? []).length, 2);
   assert.match(result.text, /- id: preset-alpha/);
   assert.match(result.text, /- id: preset-beta/);
 });

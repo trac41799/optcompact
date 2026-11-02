@@ -16,6 +16,7 @@ This page is the living contract for the core package. Harness adapters MAY depe
 | `summaryFidelity(input)` | function | Value fraction in `[0, 1]`; equals 1 at full retention |
 | `economicInterval(input)` | function | Positive turns; throws on non-positive growth, price, or retention |
 | `planSchedule(input)` | function | Token-minimal interval and retention for a quality target; throws on an invalid horizon or target |
+| `decideCheckpoint(input)` | function | Boundary-checkpoint trigger with post-compaction footprint and ratio; throws on invalid token inputs |
 | `extractAnchors(text)` | function | Deduplicated weighted anchors, deterministic order |
 | `anchorRetentionScore(anchors, text)` | function | Weighted fraction in `[0, 1]`; returns 1 for no anchors |
 | `defaultParams(overrides)` | function | Complete parameter object; never shares mutable nested state |

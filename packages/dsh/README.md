@@ -4,11 +4,12 @@ DeepSeek Harness policy plugin that decides when to compact, while the stock `ds
 
 ## How it works
 
-1. The composition mounts `dsh-compaction-basic` with `auto: false`. The backend still provides `/compact`, summarization, tool-pair validation, checkpoint framing, and overflow recovery.
+1. The composition mounts `dsh-compaction-basic` with `auto: false` and `maxTokens: 1600`. The backend keeps `/compact`, summarization, tool-pair validation, checkpoint framing, and overflow recovery.
 2. This plugin listens on `agent/pre-step`. It reads `ctx.tokenMeter.measure(session)` and the routed model window from `ctx.llm.resolveModelInfo`.
 3. When load crosses `pruneAt`, it calls the mounted `toolResultPruner.pruneSession` and re-measures. Pruning is model-free and runs before any summary.
-4. It calls `decide()` from `@optcompact/core`. On `compact`, it calls `ctx.compaction.compactRegion(start, end, agent, signal)` with the chosen cut.
-5. It re-adds an `agent/request-error` listener for `CONTEXT_WINDOW_EXCEEDED`, delegates recovery to the backend, and retries only after `surface.replaceGeneration` advances.
+4. In the default checkpoint mode it calls `decideCheckpoint`. At the first turn boundary after 50% occupancy, it keeps the last `tailNodes` nodes and asks `compactRegion` to replace the rest. The backend writes a structured checkpoint capped at `maxTokens`.
+5. `mode: "gain"` keeps the v0.3 gain-gated policy for comparison.
+6. It re-adds an `agent/request-error` listener for `CONTEXT_WINDOW_EXCEEDED`, delegates recovery to the backend, and retries only after `surface.replaceGeneration` advances.
 
 A decision error never blocks the step: the plugin logs a warning and calls `next()`.
 
@@ -45,6 +46,12 @@ Web and Desktop profiles mount an isolated `compaction` group inside each preset
 | `evidencePath` | none | Appends one JSON line per decision, skip, and committed range |
 | `prune` | true | Run the mounted tool-result pruner before deciding |
 | `pruneAt` | 0.45 | Load fraction at which pruning runs |
+| `mode` | `checkpoint` | `checkpoint` for boundary distillation, `gain` for the v0.3 policy |
+| `maxOccupancy` | 0.5 | Occupancy ceiling for a boundary checkpoint |
+| `urgentOccupancy` | 0.75 | Occupancy that forces a checkpoint without a boundary |
+| `hardOccupancy` | 0.9 | Occupancy that always forces a checkpoint |
+| `tailNodes` | 4 | Surface nodes kept verbatim after a checkpoint |
+| `checkpointTokens` | 1500 | Checkpoint budget used for the ratio estimate; set the real cap on `compaction-basic.maxTokens` |
 
 ## Known limits
 
@@ -55,5 +62,5 @@ Web and Desktop profiles mount an isolated `compaction` group inside each preset
 
 ## Verification
 
-- 8 contract tests with a fake seam.
+- 15 contract tests with a fake seam.
 - One live headless run with two committed checkpoint transactions ([report](../../docs/qa/runs/2026-10-29-live-dsh.md)).

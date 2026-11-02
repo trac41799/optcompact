@@ -4,6 +4,23 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-02
+
+### Added
+
+- Boundary checkpoint mode, now the DeepSeek Harness default: trigger at 50% occupancy on a turn boundary, 75% without one, 90% always. Keeps a short verbatim tail and replaces the rest with a structured checkpoint capped at 1600 output tokens.
+- `decideCheckpoint` in `@optcompact/core` with post-compaction footprint and per-event ratio.
+- Simulator checkpoint policy with critical units, per-event reduction, post occupancy, and critical recall.
+- ADR-0004 and the checkpoint mode run report.
+
+### Changed
+
+- `dsh-compaction-basic` is configured with `maxTokens: 1600`; the preset generator sets it for every preset.
+- Metrics are split: per-event reduction and post occupancy are separate from session-total token savings.
+
+### Verified
+
+- 85 tests pass. Measured: 88% per-event reduction, 8.6% post occupancy, 99.6% critical recall, 8.16M total tokens against 12.75M.
 ## [0.3.0] — 2026-10-29
 
 ### Added

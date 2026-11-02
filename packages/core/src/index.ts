@@ -35,4 +35,5 @@ export { distortionFloor, fidelitySlope, summaryFidelity, type FidelityInput } f
 export { economicInterval, type IntervalInput } from './interval.ts';
 export { planSchedule, type ScheduleInput, type SchedulePlan } from './schedule.ts';
 export { decide, isToolBalanced } from './policy.ts';
+export { decideCheckpoint, type CheckpointDecision, type CheckpointInput } from './checkpoint.ts';
 export { anchorRetentionScore, decisionCer, extractAnchors } from './metrics.ts';

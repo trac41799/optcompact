@@ -386,6 +386,9 @@ Defaults are hypotheses. Calibration replaces them per model and per harness.
 - **AC-8** Core evaluation allocates no network access and no runtime dependency.
 - **AC-9** No candidate below `qualityFloor` is selected.
 - **AC-10** A checkpoint below `checkpointFloor` is never folded into a new summary.
+- **AC-11** `decideCheckpoint` triggers at 0.5 occupancy only at a boundary, at 0.75 without one, and at 0.9 always.
+- **AC-12** Checkpoint mode keeps the configured verbatim tail and records the measured post-compaction ratio.
+- **AC-13** The backend checkpoint output is capped by `maxTokens`; the cap is part of the deployment configuration.
 
 ## 18. Multi-compaction schedule
 
@@ -422,3 +425,15 @@ A seeded simulator compares four policies on 20 sessions of 100 turns with a 200
 | Hazard, quality floor 0.95 | 12.16 | 95.00% | 4.2 | 15.2 |
 
 Reading: the default policy trades 13.7 points of need coverage for a 62% token reduction. The quality-first profile recovers most coverage at no token advantage over the fixed baseline. The frontier is the deliverable, not a single setting. Need coverage is not task success, so the next gate is a SWE-bench-style evaluation.
+
+## 21. Boundary checkpoint mode
+
+The v0.4 default replaces gain-gated trimming with boundary distillation.
+
+- **Trigger.** Checkpoint at the first turn boundary after occupancy reaches 0.5. Pressure at 0.75 or 0.9 forces the decision without a boundary.
+- **Tail.** Keep the last `tailNodes` surface nodes verbatim, after step-boundary snapping.
+- **Checkpoint.** Cap the backend summary at `maxTokens` (default 1600). The shipped checkpoint prompt already isolates the request, files, errors, pending work, current work, next step, and critical context.
+- **Prune.** Run the model-free tool-result pruner at 0.45 load before the decision.
+- **Metrics.** Report per-event reduction `1 - post/pre`, post occupancy `post/W`, and critical recall. Session-total token savings are a separate number and MUST NOT be presented as the compaction ratio.
+
+Measured on 20 synthetic sessions: 88% per-event reduction, 8.6% post occupancy, 99.6% critical recall, 8.16M total tokens against 12.75M for a fixed threshold. Evidence: [checkpoint mode run](../qa/runs/2026-11-02-checkpoint-mode.md).
