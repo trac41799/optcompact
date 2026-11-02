@@ -13,6 +13,7 @@
     "test": "pnpm build && node --test \"packages/*/test/*.test.ts\" scripts/preset-override.test.mjs",
     "typecheck": "tsc -b tsconfig.json",
     "build": "tsc -b tsconfig.json",
+    "bundle:dsh": "pnpm build && node scripts/build-dsh-bundle.mjs",
     "docs:check": "python ../docs-ops/scripts/check_docs.py --strict --root .",
     "docs:metrics": "python ../docs-ops/scripts/collect_metrics.py --root ."
   },
