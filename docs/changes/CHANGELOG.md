@@ -4,6 +4,15 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-11-03
+
+### Fixed
+
+- Checkpoint occupancy now matches the UI meter: provider-anchored `contextPressure.projectedTokens` over `contextPressure.contextWindow`, not `surfaceTokens`.
+- Mid-turn checkpoints trigger at 50% occupancy; the urgent threshold defaults to the ceiling instead of 0.75.
+- Manual `/compact` no longer truncates: the checkpoint cap is 32768, replacing 1600.
+- A same-turn cooldown prevents repeated checkpoints after one succeeds.
+- Evidence records window, surface, and used tokens for diagnosis.
 ## [0.4.0] — 2026-11-02
 
 ### Added

@@ -134,26 +134,46 @@ test('checkpoints at a turn boundary once occupancy reaches 50%', async () => {
   assert.equal(calls[0]?.end, 30);
 });
 
-test('waits for a boundary within the same turn', async () => {
+test('waits for a boundary within the same turn when urgency is higher', async () => {
   const { ctx, calls } = makeContext();
-  ctx.tokenMeter.measure = () => meter([[0, 5_000], [10, 20_000], [20, 20_000], [30, 10_000], [40, 5_000]]);
+  let level = 40_000;
+  ctx.tokenMeter.measure = () => {
+    const total = level;
+    const half = Math.floor((total - 5_000) / 2);
+    return { totalTokens: total, surfaceTokens: total, nodes: [
+      { seq: 0, tokens: 5_000, heuristicTokens: 5_000 },
+      { seq: 10, tokens: half, heuristicTokens: half },
+      { seq: 20, tokens: total - 5_000 - half, heuristicTokens: total - 5_000 - half }
+    ] };
+  };
   const agent = makeAgent();
-  await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 30, new AbortController().signal);
-  const second = await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 30, new AbortController().signal);
+  await maybeCheckpoint(ctx, { tailNodes: 1, urgentOccupancy: 0.9 }, agent, 30, new AbortController().signal);
+  level = 60_000;
+  const second = await maybeCheckpoint(ctx, { tailNodes: 1, urgentOccupancy: 0.9 }, agent, 30, new AbortController().signal);
   assert.equal(second?.action, 'keep');
   assert.equal(second?.reason, 'no-boundary');
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 0);
 });
 
-test('checkpoints without a boundary above urgent occupancy', async () => {
+test('checkpoints mid-turn once the ceiling is crossed', async () => {
   const { ctx, calls } = makeContext();
-  ctx.tokenMeter.measure = () => meter([[0, 5_000], [10, 30_000], [20, 30_000], [30, 20_000]]);
+  let level = 40_000;
+  ctx.tokenMeter.measure = () => {
+    const total = level;
+    const half = Math.floor((total - 5_000) / 2);
+    return { totalTokens: total, surfaceTokens: total, nodes: [
+      { seq: 0, tokens: 5_000, heuristicTokens: 5_000 },
+      { seq: 10, tokens: half, heuristicTokens: half },
+      { seq: 20, tokens: total - 5_000 - half, heuristicTokens: total - 5_000 - half }
+    ] };
+  };
   const agent = makeAgent();
   await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 31, new AbortController().signal);
-  const second = await maybeCheckpoint(ctx, { tailNodes: 1, urgentOccupancy: 0.7 }, agent, 31, new AbortController().signal);
+  level = 55_000;
+  const second = await maybeCheckpoint(ctx, { tailNodes: 1 }, agent, 31, new AbortController().signal);
   assert.equal(second?.action, 'checkpoint');
   assert.equal(second?.reason, 'urgency');
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
 });
 
 test('keeps below the occupancy ceiling', async () => {

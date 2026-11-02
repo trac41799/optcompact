@@ -57,7 +57,7 @@ export function decideCheckpoint(input: CheckpointInput): CheckpointDecision {
   if (!(input.tailTokens >= 0)) throw new Error('tailTokens must be non-negative');
 
   const maxOccupancy = input.maxOccupancy ?? 0.5;
-  const urgentOccupancy = input.urgentOccupancy ?? 0.75;
+  const urgentOccupancy = input.urgentOccupancy ?? maxOccupancy;
   const hardOccupancy = input.hardOccupancy ?? 0.9;
   const postTokens = Math.min(input.contextTokens, input.checkpointTokens + input.tailTokens);
 
@@ -70,9 +70,8 @@ export function decideCheckpoint(input: CheckpointInput): CheckpointDecision {
   });
 
   if (input.occupancy >= hardOccupancy) return decision('checkpoint', 'hard');
+  if (input.occupancy >= maxOccupancy && input.atBoundary) return decision('checkpoint', 'boundary');
   if (input.occupancy >= urgentOccupancy) return decision('checkpoint', 'urgency');
-  if (input.occupancy >= maxOccupancy) {
-    return input.atBoundary ? decision('checkpoint', 'boundary') : decision('keep', 'no-boundary');
-  }
+  if (input.occupancy >= maxOccupancy) return decision('keep', 'no-boundary');
   return decision('keep', 'below-threshold');
 }

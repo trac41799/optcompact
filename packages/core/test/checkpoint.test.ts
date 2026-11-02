@@ -17,10 +17,16 @@ test('keeps below the occupancy threshold', () => {
   assert.equal(decision.reason, 'below-threshold');
 });
 
-test('waits for a boundary above the threshold', () => {
-  const decision = decideCheckpoint({ ...base, atBoundary: false });
+test('waits for a boundary when urgency is configured higher', () => {
+  const decision = decideCheckpoint({ ...base, occupancy: 0.6, atBoundary: false, urgentOccupancy: 0.8 });
   assert.equal(decision.action, 'keep');
   assert.equal(decision.reason, 'no-boundary');
+});
+
+test('checkpoints mid-turn once the ceiling is crossed', () => {
+  const decision = decideCheckpoint({ ...base, occupancy: 0.52, atBoundary: false });
+  assert.equal(decision.action, 'checkpoint');
+  assert.equal(decision.reason, 'urgency');
 });
 
 test('checkpoints at a boundary and reports an aggressive ratio', () => {

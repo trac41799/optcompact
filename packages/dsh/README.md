@@ -4,7 +4,7 @@ DeepSeek Harness policy plugin that decides when to compact, while the stock `ds
 
 ## How it works
 
-1. The composition mounts `dsh-compaction-basic` with `auto: false` and `maxTokens: 1600`. The backend keeps `/compact`, summarization, tool-pair validation, checkpoint framing, and overflow recovery.
+1. The composition mounts `dsh-compaction-basic` with `auto: false` and `maxTokens: 32768`. The backend keeps `/compact`, summarization, tool-pair validation, checkpoint framing, and overflow recovery.
 2. This plugin listens on `agent/pre-step`. It reads `ctx.tokenMeter.measure(session)` and the routed model window from `ctx.llm.resolveModelInfo`.
 3. When load crosses `pruneAt`, it calls the mounted `toolResultPruner.pruneSession` and re-measures. Pruning is model-free and runs before any summary.
 4. In the default checkpoint mode it calls `decideCheckpoint`. At the first turn boundary after 50% occupancy, it keeps the last `tailNodes` nodes and asks `compactRegion` to replace the rest. The backend writes a structured checkpoint capped at `maxTokens`.
@@ -48,10 +48,10 @@ Web and Desktop profiles mount an isolated `compaction` group inside each preset
 | `pruneAt` | 0.45 | Load fraction at which pruning runs |
 | `mode` | `checkpoint` | `checkpoint` for boundary distillation, `gain` for the v0.3 policy |
 | `maxOccupancy` | 0.5 | Occupancy ceiling for a boundary checkpoint |
-| `urgentOccupancy` | 0.75 | Occupancy that forces a checkpoint without a boundary |
+| `urgentOccupancy` | 0.5 | Occupancy that forces a checkpoint without a boundary (defaults to `maxOccupancy`) |
 | `hardOccupancy` | 0.9 | Occupancy that always forces a checkpoint |
 | `tailNodes` | 4 | Surface nodes kept verbatim after a checkpoint |
-| `checkpointTokens` | 1500 | Checkpoint budget used for the ratio estimate; set the real cap on `compaction-basic.maxTokens` |
+| `checkpointTokens` | 4000 | Checkpoint budget used for the ratio estimate; set the real cap on `compaction-basic.maxTokens` |
 
 ## Known limits
 

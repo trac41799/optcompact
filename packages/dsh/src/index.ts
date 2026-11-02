@@ -101,7 +101,7 @@ export interface DshConfig {
   mode?: 'checkpoint' | 'gain';
   /** Occupancy ceiling for a boundary checkpoint. Defaults to 0.5. */
   maxOccupancy?: number;
-  /** Occupancy that forces a checkpoint without a boundary. Defaults to 0.75. */
+  /** Occupancy that forces a checkpoint without a boundary. Defaults to `maxOccupancy`. */
   urgentOccupancy?: number;
   /** Occupancy that forces an immediate checkpoint. Defaults to 0.9. */
   hardOccupancy?: number;
@@ -115,6 +115,26 @@ const lastCheckpointTurn = new WeakMap<DshSession, number>();
 
 interface PrunerService {
   pruneSession(session: DshSession): unknown;
+}
+
+interface ContextPressure {
+  projectedTokens?: number;
+  pressureTokens?: number;
+  contextWindow?: number;
+}
+
+interface ProjectionRegistry {
+  snapshot?(session: DshSession, keys?: readonly string[]): { values?: { contextPressure?: ContextPressure } } | undefined;
+}
+
+/** Read the same occupancy source the UI meter uses, when available. */
+function pressureOf(ctx: DshContext, session: DshSession): ContextPressure | undefined {
+  try {
+    const registry = ctx.get?.('sessionProjections') as ProjectionRegistry | undefined;
+    return registry?.snapshot?.(session, ['contextPressure'])?.values?.contextPressure;
+  } catch {
+    return undefined;
+  }
 }
 
 function optionalPruner(ctx: DshContext): PrunerService | undefined {
@@ -363,9 +383,12 @@ export async function maybeCheckpoint(
 
   let measurement = ctx.tokenMeter.measure(agent.session);
   let pruned = false;
-  const windowTokens = info.context.contextWindow;
+  const pressure = pressureOf(ctx, agent.session);
+  const windowTokens = pressure?.contextWindow ?? info.context.contextWindow;
+  const surfaceTokens = measurement.surfaceTokens || measurement.totalTokens;
+  const usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens ?? surfaceTokens;
   const pruneAt = config.pruneAt ?? 0.45;
-  if (config.prune !== false && (measurement.surfaceTokens || measurement.totalTokens) / windowTokens >= pruneAt) {
+  if (config.prune !== false && usedTokens / windowTokens >= pruneAt) {
     const pruner = optionalPruner(ctx);
     if (pruner) {
       try {
@@ -378,9 +401,13 @@ export async function maybeCheckpoint(
     }
   }
 
-  const contextTokens = measurement.surfaceTokens || measurement.totalTokens;
+  const contextTokens = usedTokens;
   const boundary = lastCheckpointTurn.get(agent.session) !== turn;
   lastCheckpointTurn.set(agent.session, turn);
+  if (lastCompaction.get(agent.session) === turn) {
+    recordSkip(config.evidencePath, turn, 'cooldown');
+    return null;
+  }
   const occupancy = contextTokens / windowTokens;
   const { units, seqs } = buildUnits(measurement, turn, config.firstCompactableNode ?? 1);
 
@@ -392,16 +419,19 @@ export async function maybeCheckpoint(
     atBoundary: boundary,
     contextTokens,
     windowTokens,
-    checkpointTokens: config.checkpointTokens ?? 1_500,
+    checkpointTokens: config.checkpointTokens ?? 4_000,
     tailTokens,
     maxOccupancy: config.maxOccupancy ?? 0.5,
-    urgentOccupancy: config.urgentOccupancy ?? 0.75,
+    urgentOccupancy: config.urgentOccupancy ?? 0.5,
     hardOccupancy: config.hardOccupancy ?? 0.9
   });
   writeEvidence(config.evidencePath ?? '', {
     mode: 'checkpoint',
     turn,
     occupancy,
+    windowTokens,
+    surfaceTokens,
+    usedTokens,
     boundary,
     pruned,
     ...decision
@@ -429,7 +459,12 @@ export async function maybeCheckpoint(
   let actual = decision;
   try {
     const after = ctx.tokenMeter.measure(agent.session);
-    const afterTokens = after.surfaceTokens || after.totalTokens;
+    const afterPressure = pressureOf(ctx, agent.session);
+    const afterTokens =
+      afterPressure?.projectedTokens ??
+      afterPressure?.pressureTokens ??
+      after.surfaceTokens ??
+      after.totalTokens;
     actual = {
       ...decision,
       postTokens: afterTokens,

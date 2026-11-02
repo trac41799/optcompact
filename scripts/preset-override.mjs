@@ -89,12 +89,12 @@ function patchPresetBlock(block, options) {
     }
     const hasConfig = group.slice(basic, basicEnd).some((line) => PLUGIN_CONFIG.test(line));
     if (!hasConfig) {
-      group.splice(basic + 2, 0, '            config:', '              auto: false', '              maxTokens: 1600');
+      group.splice(basic + 2, 0, '            config:', '              auto: false', '              maxTokens: 32768');
     } else {
       const configIndex = group.findIndex((line, i) => i > basic && PLUGIN_CONFIG.test(line));
       const additions = [];
       if (!group.slice(basic, basicEnd).some((line) => /^ {14}auto: false$/.test(line))) additions.push('              auto: false');
-      if (!group.slice(basic, basicEnd).some((line) => /^ {14}maxTokens:/.test(line))) additions.push('              maxTokens: 1600');
+      if (!group.slice(basic, basicEnd).some((line) => /^ {14}maxTokens:/.test(line))) additions.push('              maxTokens: 32768');
       if (additions.length > 0) group.splice(configIndex + 1, 0, ...additions);
     }
 

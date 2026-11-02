@@ -12,12 +12,12 @@
 | Decision evidence | `%DSH_HOME%\profiles\tauri\optcompact-events.jsonl` |
 | Backups | `cordis.patch.yml.bak-optcompact-20261102-143218`, `package.json.bak-optcompact-20261102-143218` |
 
-Each of the 8 presets gained one `optcompact-policy` row inside its isolated `compaction` group. Each `compaction-basic` row gained `auto: false` and `maxTokens: 1600`.
+Each of the 8 presets gained one `optcompact-policy` row inside its isolated `compaction` group. Each `compaction-basic` row gained `auto: false` and `maxTokens: 32768`.
 
 ## Verification
 
 - `dsh --profile tauri --dump-config` exits 0.
-- 8 preset blocks, 8 policy rows, 8 `auto: false`, 8 `maxTokens: 1600`, 8 `evidencePath` rows.
+- 8 preset blocks, 8 policy rows, 8 `auto: false`, 8 `maxTokens: 32768`, 8 `evidencePath` rows.
 - `import('@optcompact/dsh')` from the profile root exports `apply`, `inject`, `install`, `maybeCheckpoint`, `maybeCompact`.
 - No competing host-plane trigger: the tauri profile disables host `compaction-basic`.
 
@@ -47,6 +47,6 @@ Restart the app.
 ## Caveats
 
 - Live behavior is unverified until the restart. Composition and module resolution are verified.
-- The backend caps every checkpoint at 1600 tokens. The policy keeps the last 4 surface nodes verbatim.
+- The backend caps every checkpoint at 32768 tokens. The policy keeps the last 4 surface nodes verbatim.
 - Aggressive distillation drops bulk detail by design; raise `tailNodes` or the checkpoint cap if next-action retention proves weak.
 - Editing presets restates them in full. A DSH upgrade can invalidate the overlay; regenerate it with `scripts/preset-override.mjs`.

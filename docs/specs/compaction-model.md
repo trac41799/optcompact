@@ -386,7 +386,7 @@ Defaults are hypotheses. Calibration replaces them per model and per harness.
 - **AC-8** Core evaluation allocates no network access and no runtime dependency.
 - **AC-9** No candidate below `qualityFloor` is selected.
 - **AC-10** A checkpoint below `checkpointFloor` is never folded into a new summary.
-- **AC-11** `decideCheckpoint` triggers at 0.5 occupancy only at a boundary, at 0.75 without one, and at 0.9 always.
+- **AC-11** `decideCheckpoint` triggers at 0.5 occupancy, preferring a boundary, and at 0.9 always.
 - **AC-12** Checkpoint mode keeps the configured verbatim tail and records the measured post-compaction ratio.
 - **AC-13** The backend checkpoint output is capped by `maxTokens`; the cap is part of the deployment configuration.
 
@@ -430,9 +430,9 @@ Reading: the default policy trades 13.7 points of need coverage for a 62% token 
 
 The v0.4 default replaces gain-gated trimming with boundary distillation.
 
-- **Trigger.** Checkpoint at the first turn boundary after occupancy reaches 0.5. Pressure at 0.75 or 0.9 forces the decision without a boundary.
+- **Trigger.** Checkpoint once occupancy reaches 0.5, preferring a turn boundary. Pressure at 0.9 forces the decision. Occupancy is the `contextPressure.projectedTokens` value divided by `contextPressure.contextWindow`, the same source the UI meter uses.
 - **Tail.** Keep the last `tailNodes` surface nodes verbatim, after step-boundary snapping.
-- **Checkpoint.** Cap the backend summary at `maxTokens` (default 1600). The shipped checkpoint prompt already isolates the request, files, errors, pending work, current work, next step, and critical context.
+- **Checkpoint.** Cap the backend summary at `maxTokens` (default 32768). The shipped checkpoint prompt already isolates the request, files, errors, pending work, current work, next step, and critical context.
 - **Prune.** Run the model-free tool-result pruner at 0.45 load before the decision.
 - **Metrics.** Report per-event reduction `1 - post/pre`, post occupancy `post/W`, and critical recall. Session-total token savings are a separate number and MUST NOT be presented as the compaction ratio.
 
