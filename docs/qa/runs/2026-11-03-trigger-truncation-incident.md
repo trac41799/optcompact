@@ -42,3 +42,9 @@ command/done  {"kind":"error","text":"Compaction could not produce a useful summ
 
 - The running app must restart to load the rebuilt bundle.
 - Retest `/compact` and watch for a checkpoint before 60% occupancy.
+
+## Follow-up: post-compaction projection residual
+
+The first post-restart checkpoint retained a 1,730-token summary plus a 1,590-token tail.
+Evidence initially reported `postTokens: 126,509`. That figure was a projection residual, not retained context. The provider anchor predated the shadow, while the removed span was repriced at four characters per token.
+v0.4.2 reports `postTokens` and `ratio` on the surface basis and recomputes occupancy after pruning. The next provider request re-anchors the meter.

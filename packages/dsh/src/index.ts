@@ -383,10 +383,10 @@ export async function maybeCheckpoint(
 
   let measurement = ctx.tokenMeter.measure(agent.session);
   let pruned = false;
-  const pressure = pressureOf(ctx, agent.session);
+  let pressure = pressureOf(ctx, agent.session);
   const windowTokens = pressure?.contextWindow ?? info.context.contextWindow;
-  const surfaceTokens = measurement.surfaceTokens || measurement.totalTokens;
-  const usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens ?? surfaceTokens;
+  let surfaceTokens = measurement.surfaceTokens || measurement.totalTokens;
+  let usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens ?? surfaceTokens;
   const pruneAt = config.pruneAt ?? 0.45;
   if (config.prune !== false && usedTokens / windowTokens >= pruneAt) {
     const pruner = optionalPruner(ctx);
@@ -394,6 +394,9 @@ export async function maybeCheckpoint(
       try {
         pruner.pruneSession(agent.session);
         measurement = ctx.tokenMeter.measure(agent.session);
+        pressure = pressureOf(ctx, agent.session);
+        surfaceTokens = measurement.surfaceTokens || measurement.totalTokens;
+        usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens ?? surfaceTokens;
         pruned = true;
       } catch (error) {
         ctx.logger.warn(`optcompact: prune failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -458,17 +461,15 @@ export async function maybeCheckpoint(
   lastCompaction.set(agent.session, turn);
   let actual = decision;
   try {
+    // Measure the post state on the same surface basis as the pre surface total:
+    // the projection still carries a provider/heuristic residual right after a
+    // large shadow, which would overstate the retained context.
     const after = ctx.tokenMeter.measure(agent.session);
-    const afterPressure = pressureOf(ctx, agent.session);
-    const afterTokens =
-      afterPressure?.projectedTokens ??
-      afterPressure?.pressureTokens ??
-      after.surfaceTokens ??
-      after.totalTokens;
+    const afterTokens = after.surfaceTokens || after.totalTokens;
     actual = {
       ...decision,
       postTokens: afterTokens,
-      ratio: contextTokens > 0 ? 1 - afterTokens / contextTokens : 0,
+      ratio: surfaceTokens > 0 ? 1 - afterTokens / surfaceTokens : 0,
       targetOccupancy: afterTokens / windowTokens
     };
   } catch {

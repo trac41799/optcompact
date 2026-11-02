@@ -26,7 +26,7 @@ writeFileSync(
   `${JSON.stringify(
     {
       name: '@optcompact/dsh',
-      version: '0.4.1',
+      version: '0.4.2',
       type: 'module',
       main: './index.js',
       exports: { '.': './index.js' },

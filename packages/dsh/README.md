@@ -64,3 +64,5 @@ Web and Desktop profiles mount an isolated `compaction` group inside each preset
 
 - 15 contract tests with a fake seam.
 - One live headless run with two committed checkpoint transactions ([report](../../docs/qa/runs/2026-10-29-live-dsh.md)).
+
+Occupancy uses `contextPressure.projectedTokens / contextWindow` (the UI meter). Post-compaction `postTokens` and `ratio` use the surface measurement, because the projection carries a heuristic residual until the next request.

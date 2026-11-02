@@ -4,6 +4,13 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-11-03
+
+### Fixed
+
+- Post-compaction evidence measures the retained surface, not the projection residual, so `ratio` and `postTokens` reflect the actual checkpoint.
+- Occupancy is recomputed after pruning, so a pruned turn decides on current pressure.
+
 ## [0.4.1] — 2026-11-03
 
 ### Fixed
