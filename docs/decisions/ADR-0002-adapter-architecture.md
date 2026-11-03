@@ -23,6 +23,8 @@ Adopt option 2 for DeepSeek Harness and option 4 for Codex.
 
 For DeepSeek Harness, the plugin listens on `agent/pre-step`, builds state from `ctx.tokenMeter.measure` and `ctx.llm.resolveModelInfo`, decides with `@optcompact/core`, and calls `ctx.compaction.compactRegion`. It re-adds an `agent/request-error` listener that delegates `CONTEXT_WINDOW_EXCEEDED` recovery to the stock backend and retries only after `surface.replaceGeneration` advances.
 
+The compaction backend is read per call through `ctx.get("compaction")`, never declared in `inject`. A preset row that cannot see the isolated `compaction` group would otherwise stay permanently pending, and the preset registry treats any pending row as fatal: `retain()` rejects with `agent-preset/invalid`, so every session on that preset fails to resume. The policy is advisory, so a missing backend must leave it inert and say so once, not block the composition.
+
 For Codex, the package provides a `CodexPolicy` controller for the app-server usage stream and a parser for `PostCompact` hook payloads. It states that the control path is experimental and unverified end to end.
 
 ## Consequences
@@ -33,11 +35,13 @@ Positive:
 - The policy uses documented seams only.
 - Each adapter is small enough to test against a fake harness.
 - The same core decision drives both harnesses.
+- A mis-mounted policy row degrades to an inert warning instead of a fatal preset error.
 
 Negative:
 
 - The DSH plugin must copy the backend range walk because it is not exported.
 - Preset-backed DSH profiles isolate the compaction service, so the bundle patch reaches host-plane profiles only.
+- The backend is resolved per call, so a badly mounted row compacts nothing and reports an inert warning instead of failing loudly at mount time.
 - Codex hooks cannot veto without aborting a turn, so evidence collection is their only use.
 - The Codex control path depends on an experimental app-server API.
 
