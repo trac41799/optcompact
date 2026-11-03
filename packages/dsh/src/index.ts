@@ -75,7 +75,16 @@ export interface DshContext {
   logger: { warn(message: string): void; info?(message: string): void };
   tokenMeter: DshTokenMeter;
   llm: DshLlm;
-  compaction: DshCompaction;
+  /**
+   * Stock compaction backend, read opportunistically rather than injected.
+   *
+   * The service lives in the preset's isolated `compaction` group, so a row
+   * mounted anywhere else resolves it to `undefined`. Declaring it in `inject`
+   * would leave the row permanently pending, and a pending preset row is fatal
+   * to every session that selects that preset — the policy must stay inert
+   * instead of blocking the composition.
+   */
+  compaction?: DshCompaction;
 }
 
 /** Plugin configuration. */
@@ -146,6 +155,33 @@ function optionalPruner(ctx: DshContext): PrunerService | undefined {
   } catch {
     return undefined;
   }
+}
+
+const warnedNoCompaction = new WeakSet<DshSession>();
+
+/**
+ * Read the stock compaction backend from this scope.
+ *
+ * Returns `undefined` when the row cannot see the preset's isolated
+ * `compaction` group, or when its provider is not active yet. The caller then
+ * skips the transaction and records why, so a mis-mounted row degrades to a
+ * warning instead of failing the preset mount.
+ */
+export function compactionOf(ctx: DshContext, session: DshSession): DshCompaction | undefined {
+  let service: DshCompaction | undefined;
+  try {
+    service = (ctx.get?.('compaction') as DshCompaction | undefined) ?? ctx.compaction;
+  } catch {
+    service = undefined;
+  }
+  if (service && typeof service.compactRegion === 'function') return service;
+  if (!warnedNoCompaction.has(session)) {
+    warnedNoCompaction.add(session);
+    ctx.logger.warn(
+      'optcompact: no compaction backend in this scope; the policy stays inert. Mount this row inside the preset compaction group.'
+    );
+  }
+  return undefined;
 }
 
 const DEFAULT_PRICES = { input: 1, output: 4, fixedCallCost: 20_000 };
@@ -323,6 +359,11 @@ export async function maybeCompact(
   config.onDecision?.(decision, agent, turn);
   if (decision.action !== 'compact') return decision;
   if (signal.aborted) return decision;
+  const compaction = compactionOf(ctx, agent.session);
+  if (!compaction) {
+    recordSkip(config.evidencePath, turn, 'no-compaction-service');
+    return null;
+  }
 
   let cut = decision.cutIndex;
   if (agent.session.eventAt) {
@@ -338,7 +379,7 @@ export async function maybeCompact(
   const startSeq = seqs[0];
   if (startSeq === undefined || endSeq === undefined) return decision;
 
-  await ctx.compaction.compactRegion(startSeq, endSeq, agent, signal);
+  await compaction.compactRegion(startSeq, endSeq, agent, signal);
   lastCompaction.set(agent.session, turn);
   writeEvidence(config.evidencePath ?? '', {
     turn,
@@ -468,6 +509,11 @@ export async function maybeCheckpoint(
     recordSkip(config.evidencePath, turn, 'insufficient-units');
     return null;
   }
+  const compaction = compactionOf(ctx, agent.session);
+  if (!compaction) {
+    recordSkip(config.evidencePath, turn, 'no-compaction-service');
+    return null;
+  }
   if (agent.session.eventAt) {
     const typeOf = (seq: number): string | undefined => agent.session.eventAt?.(seq)?.type;
     cut = snapCutToStep(seqs, cut, typeOf);
@@ -480,7 +526,7 @@ export async function maybeCheckpoint(
   const endSeq = seqs[cut - 1];
   if (startSeq === undefined || endSeq === undefined) return null;
 
-  await ctx.compaction.compactRegion(startSeq, endSeq, agent, signal);
+  await compaction.compactRegion(startSeq, endSeq, agent, signal);
   lastCompaction.set(agent.session, turn);
   let actual = decision;
   try {
@@ -543,9 +589,11 @@ export function install(ctx: DshContext, config: DshConfig = {}): () => void {
         signal: AbortSignal;
       };
       if (failure.code !== 'CONTEXT_WINDOW_EXCEEDED' || signal.aborted) return next();
+      const compaction = compactionOf(ctx, agent.session);
+      if (!compaction) return next();
       const generation = agent.session.surface.replaceGeneration;
       try {
-        await ctx.compaction.compactIfNeeded(agent, 'context-overflow', signal);
+        await compaction.compactIfNeeded(agent, 'context-overflow', signal);
       } catch (error) {
         ctx.logger.warn(`optcompact: overflow recovery failed: ${error instanceof Error ? error.message : String(error)}`);
         return next();
@@ -562,8 +610,15 @@ export function install(ctx: DshContext, config: DshConfig = {}): () => void {
 /** Cordis plugin name. */
 export const name = 'optcompact-compaction-policy';
 
-/** Services required from the composition. */
-export const inject = ['compaction', 'tokenMeter', 'llm'];
+/**
+ * Services required from the composition.
+ *
+ * The compaction backend is deliberately absent: it lives in the preset's
+ * isolated `compaction` group, and a row that cannot see it would pend forever.
+ * DSH treats a pending preset row as fatal for every session on that preset, so
+ * the backend is resolved per call through {@link compactionOf} instead.
+ */
+export const inject = ['tokenMeter', 'llm'];
 
 /** Cordis plugin entry. */
 export function apply(ctx: DshContext, config: DshConfig = {}): () => void {

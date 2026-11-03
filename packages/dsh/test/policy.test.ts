@@ -220,6 +220,68 @@ test('works when no pruner service is mounted', async () => {
   assert.ok(decision === null || typeof decision.action === 'string');
 });
 
+test('does not require the compaction service for activation', async () => {
+  const module = await import('../src/index.ts');
+  assert.deepEqual([...module.inject].sort(), ['llm', 'tokenMeter']);
+});
+
+test('stays inert in gain mode when the compaction service is absent', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'optcompact-nobackend-'));
+  const path = join(dir, 'events.jsonl');
+  const warnings: string[] = [];
+  const { ctx, calls } = makeContext({
+    compaction: undefined,
+    logger: { warn: (message: string) => warnings.push(message) }
+  });
+  const decision = await maybeCompact(ctx, { evidencePath: path }, makeAgent(), 30, new AbortController().signal);
+  assert.equal(decision, null);
+  assert.equal(calls.length, 0);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0] ?? '', /no compaction backend/);
+  const records = readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
+  assert.equal(records.at(-1)?.action, 'skip');
+  assert.equal(records.at(-1)?.reason, 'no-compaction-service');
+});
+
+test('stays inert in checkpoint mode when the compaction service is absent', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'optcompact-nobackend-cp-'));
+  const path = join(dir, 'events.jsonl');
+  const { ctx, calls } = makeContext({ compaction: undefined });
+  ctx.tokenMeter.measure = () => meter([[0, 5_000], [10, 60_000], [20, 60_000], [30, 10_000]]);
+  const decision = await maybeCheckpoint(
+    ctx,
+    { evidencePath: path, tailNodes: 1 },
+    makeAgent(),
+    30,
+    new AbortController().signal
+  );
+  assert.equal(decision, null);
+  assert.equal(calls.length, 0);
+  const records = readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
+  assert.equal(records.at(-1)?.action, 'skip');
+  assert.equal(records.at(-1)?.reason, 'no-compaction-service');
+});
+
+test('overflow recovery delegates to the next handler when the service is absent', async () => {
+  const handlers = new Map<string, (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>>();
+  const ctx = {
+    on: (event: string, handler: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => {
+      handlers.set(event, handler);
+    },
+    logger: { warn: () => {} },
+    tokenMeter: { measure: () => ({ totalTokens: 0, surfaceTokens: 0, nodes: [] }) },
+    llm: { resolveModelInfo: async () => ({}) }
+  } as unknown as DshContext;
+  install(ctx, {});
+  const handler = handlers.get('agent/request-error');
+  assert.ok(handler);
+  const result = await handler(
+    { agent: makeAgent(), failure: { code: 'CONTEXT_WINDOW_EXCEEDED' }, signal: new AbortController().signal },
+    () => Promise.resolve('next')
+  );
+  assert.equal(result, 'next');
+});
+
 test('snaps a cut to a step boundary marked by a user message', () => {
   const seqs = [10, 20, 30, 40, 50];
   const types: Record<number, string> = {

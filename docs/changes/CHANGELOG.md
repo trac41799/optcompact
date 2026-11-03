@@ -4,6 +4,18 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-11-03
+
+### Fixed
+
+- A policy row that cannot see the preset's isolated `compaction` group no longer blocks every session on that preset. The plugin no longer declares `compaction` in `inject`; DSH reports a pending preset row as `agent-preset/invalid` and refuses to resume any session that selects the preset.
+- The backend is resolved per call through `compactionOf` (`ctx.get('compaction')` with a guarded fallback). When it is absent the plugin warns once per session, records `no-compaction-service`, and leaves the step alone. The overflow handler delegates to `next()`.
+
+### Verified
+
+- 96 tests pass, typecheck clean.
+- Incident report: [`qa/runs/2026-11-03-preset-mount-block.md`](../qa/runs/2026-11-03-preset-mount-block.md).
+
 ## [0.5.0] — 2026-11-03
 
 ### Added
