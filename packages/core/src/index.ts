@@ -36,4 +36,5 @@ export { economicInterval, type IntervalInput } from './interval.ts';
 export { planSchedule, type ScheduleInput, type SchedulePlan } from './schedule.ts';
 export { decide, isToolBalanced } from './policy.ts';
 export { decideCheckpoint, type CheckpointDecision, type CheckpointInput } from './checkpoint.ts';
+export { selectOccupancy, type OccupancyInput, type OccupancySample } from './occupancy.ts';
 export { anchorRetentionScore, decisionCer, extractAnchors } from './metrics.ts';

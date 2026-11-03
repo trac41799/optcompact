@@ -11,6 +11,7 @@ import {
   decide,
   decideCheckpoint,
   defaultParams,
+  selectOccupancy,
   type CheckpointDecision,
   type ContextUnit,
   type Decision,
@@ -112,6 +113,7 @@ export interface DshConfig {
 }
 
 const lastCheckpointTurn = new WeakMap<DshSession, number>();
+const lastRoute = new WeakMap<DshSession, string>();
 
 interface PrunerService {
   pruneSession(session: DshSession): unknown;
@@ -381,14 +383,24 @@ export async function maybeCheckpoint(
     return null;
   }
 
+  const routeKey = `${target.provider}/${target.model}`;
+  const previousRoute = lastRoute.get(agent.session);
+  const routeChanged = previousRoute !== undefined && previousRoute !== routeKey;
+  lastRoute.set(agent.session, routeKey);
+
   let measurement = ctx.tokenMeter.measure(agent.session);
   let pruned = false;
   let pressure = pressureOf(ctx, agent.session);
-  const windowTokens = pressure?.contextWindow ?? info.context.contextWindow;
+  const windowTokens = routeChanged ? info.context.contextWindow : pressure?.contextWindow ?? info.context.contextWindow;
   let surfaceTokens = measurement.surfaceTokens || measurement.totalTokens;
-  let usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens ?? surfaceTokens;
+  let sample = selectOccupancy({
+    providerTokens: pressure?.projectedTokens ?? pressure?.pressureTokens,
+    surfaceTokens,
+    capacityTokens: windowTokens,
+    routeChanged
+  });
   const pruneAt = config.pruneAt ?? 0.45;
-  if (config.prune !== false && usedTokens / windowTokens >= pruneAt) {
+  if (config.prune !== false && sample.usedTokens / windowTokens >= pruneAt) {
     const pruner = optionalPruner(ctx);
     if (pruner) {
       try {
@@ -396,7 +408,12 @@ export async function maybeCheckpoint(
         measurement = ctx.tokenMeter.measure(agent.session);
         pressure = pressureOf(ctx, agent.session);
         surfaceTokens = measurement.surfaceTokens || measurement.totalTokens;
-        usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens ?? surfaceTokens;
+        sample = selectOccupancy({
+          providerTokens: pressure?.projectedTokens ?? pressure?.pressureTokens,
+          surfaceTokens,
+          capacityTokens: windowTokens,
+          routeChanged
+        });
         pruned = true;
       } catch (error) {
         ctx.logger.warn(`optcompact: prune failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -404,7 +421,8 @@ export async function maybeCheckpoint(
     }
   }
 
-  const contextTokens = usedTokens;
+  const contextTokens = sample.usedTokens;
+  const safetyTokens = Math.max(sample.usedTokens, surfaceTokens);
   const boundary = lastCheckpointTurn.get(agent.session) !== turn;
   lastCheckpointTurn.set(agent.session, turn);
   if (lastCompaction.get(agent.session) === turn) {
@@ -426,7 +444,8 @@ export async function maybeCheckpoint(
     tailTokens,
     maxOccupancy: config.maxOccupancy ?? 0.5,
     urgentOccupancy: config.urgentOccupancy ?? 0.5,
-    hardOccupancy: config.hardOccupancy ?? 0.9
+    hardOccupancy: config.hardOccupancy ?? 0.9,
+    safetyOccupancy: safetyTokens / windowTokens
   });
   writeEvidence(config.evidencePath ?? '', {
     mode: 'checkpoint',
@@ -434,7 +453,11 @@ export async function maybeCheckpoint(
     occupancy,
     windowTokens,
     surfaceTokens,
-    usedTokens,
+    usedTokens: sample.usedTokens,
+    source: sample.source,
+    route: routeKey,
+    routeChanged,
+    safetyOccupancy: safetyTokens / windowTokens,
     boundary,
     pruned,
     ...decision

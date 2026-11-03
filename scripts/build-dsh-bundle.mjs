@@ -5,11 +5,12 @@
  *
  * Output: build/optcompact-dsh/{index.js,package.json}
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { build } from 'esbuild';
 
 const outdir = resolve('build/optcompact-dsh');
+const pkg = JSON.parse(readFileSync(resolve('packages/dsh/package.json'), 'utf8'));
 mkdirSync(outdir, { recursive: true });
 
 await build({
@@ -26,7 +27,7 @@ writeFileSync(
   `${JSON.stringify(
     {
       name: '@optcompact/dsh',
-      version: '0.4.2',
+      version: pkg.version,
       type: 'module',
       main: './index.js',
       exports: { '.': './index.js' },

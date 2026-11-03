@@ -4,6 +4,23 @@ All notable changes to this project. Format: [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-03
+
+### Added
+
+- `selectOccupancy` in `@optcompact/core`: chooses the provider sample when it is current, otherwise the surface estimate, without importing harness APIs.
+- `CheckpointInput.safetyOccupancy`: the hard 0.9 checkpoint uses the larger of the provider and surface estimates.
+- ADR-0005, the occupancy contract plan, and the BDD run report.
+
+### Changed
+
+- The DeepSeek Harness adapter tracks the last `provider/model` per session. A route change ignores the previous route's projection for that decision and resolves the new window.
+- Checkpoint evidence records `source`, `route`, `routeChanged`, and `safetyOccupancy`.
+
+### Verified
+
+- 92 tests pass, typecheck clean, docs gate 0 errors / 0 warnings.
+
 ## [0.4.2] — 2026-11-03
 
 ### Fixed

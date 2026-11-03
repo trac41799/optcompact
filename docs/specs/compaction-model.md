@@ -1,6 +1,7 @@
 # Compaction scheduling model
 
-**Status:** Proposed · **Version:** 1.0 · **Governing ADR:** [ADR-0001](../decisions/ADR-0001-hazard-rate-distortion-model.md)
+**Status:** Proposed · **Version:** 1.1
+**Governing ADR:** [ADR-0001](../decisions/ADR-0001-hazard-rate-distortion-model.md) · **Measurement:** [ADR-0005](../decisions/ADR-0005-occupancy-source.md)
 
 ## 1. Purpose
 
@@ -389,6 +390,8 @@ Defaults are hypotheses. Calibration replaces them per model and per harness.
 - **AC-11** `decideCheckpoint` triggers at 0.5 occupancy, preferring a boundary, and at 0.9 always.
 - **AC-12** Checkpoint mode keeps the configured verbatim tail and records the measured post-compaction ratio.
 - **AC-13** The backend checkpoint output is capped by `maxTokens`; the cap is part of the deployment configuration.
+- **AC-14** A compaction decision MUST use the provider sample while it is current, and the surface estimate when the sample is absent or the route changed.
+- **AC-15** The hard checkpoint MUST fire when either occupancy estimate reaches 0.9, even if the primary estimate is lower.
 
 ## 18. Multi-compaction schedule
 
@@ -430,7 +433,8 @@ Reading: the default policy trades 13.7 points of need coverage for a 62% token 
 
 The v0.4 default replaces gain-gated trimming with boundary distillation.
 
-- **Trigger.** Checkpoint once occupancy reaches 0.5, preferring a turn boundary. Pressure at 0.9 forces the decision. Occupancy is the `contextPressure.projectedTokens` value divided by `contextPressure.contextWindow`, the same source the UI meter uses.
+- **Trigger.** Checkpoint once occupancy reaches 0.5, preferring a turn boundary. Pressure at 0.9 forces the decision.
+- **Occupancy.** Each adapter MUST supply the best estimate of the next request's prompt size. The provider-anchored sample (`contextPressure.projectedTokens` over `contextPressure.contextWindow` in DeepSeek Harness, provider `inputTokens` in Codex) MUST be selected when it is finite and was taken on the current route. If the sample is absent or the route changed, the adapter MUST fall back to its surface estimate and the freshly resolved window. `selectOccupancy` in `@optcompact/core` implements the selection; the core MUST NOT import harness APIs. The hard 0.9 decision MUST use the larger of the provider and surface estimates.
 - **Tail.** Keep the last `tailNodes` surface nodes verbatim, after step-boundary snapping.
 - **Checkpoint.** Cap the backend summary at `maxTokens` (default 32768). The shipped checkpoint prompt already isolates the request, files, errors, pending work, current work, next step, and critical context.
 - **Prune.** Run the model-free tool-result pruner at 0.45 load before the decision.

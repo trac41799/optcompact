@@ -262,3 +262,46 @@ test('install registers pre-step and overflow handlers', () => {
   assert.deepEqual(registered, ['agent/pre-step', 'agent/request-error']);
   assert.equal(typeof dispose, 'function');
 });
+
+test('falls back to the surface estimate after a route change', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'optcompact-route-'));
+  const path = join(dir, 'events.jsonl');
+  let route = { provider: 'deepseek', model: 'deepseek-chat' };
+  const pressure = { projectedTokens: 45_000, contextWindow: 100_000 };
+  const { ctx } = makeContext({
+    tokenMeter: {
+      measure: () => ({
+        totalTokens: 30_000,
+        surfaceTokens: 30_000,
+        nodes: [
+          { seq: 0, tokens: 6_000 },
+          { seq: 10, tokens: 6_000 },
+          { seq: 20, tokens: 6_000 },
+          { seq: 30, tokens: 6_000 },
+          { seq: 40, tokens: 6_000 }
+        ]
+      })
+    },
+    get: (name: string) =>
+      name === 'sessionProjections' ? { snapshot: () => ({ values: { contextPressure: pressure } }) } : undefined
+  });
+  const agent: DshAgent = {
+    session: {
+      surface: { nodes: [0, 10, 20, 30, 40], replaceGeneration: 0 },
+      requestHeader: () => ({ config: route })
+    }
+  };
+  const signal = new AbortController().signal;
+
+  await maybeCheckpoint(ctx, { evidencePath: path, tailNodes: 2 }, agent, 30, signal);
+  route = { provider: 'deepseek', model: 'deepseek-reasoner' };
+  await maybeCheckpoint(ctx, { evidencePath: path, tailNodes: 2 }, agent, 31, signal);
+
+  const lines = readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
+  assert.equal(lines[0]?.source, 'provider');
+  assert.equal(lines[0]?.occupancy, 0.45);
+  assert.equal(lines[1]?.source, 'surface');
+  assert.equal(lines[1]?.routeChanged, true);
+  assert.equal(lines[1]?.usedTokens, 30_000);
+  assert.equal(lines[1]?.occupancy, 0.3);
+});

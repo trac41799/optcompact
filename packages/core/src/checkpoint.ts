@@ -13,6 +13,11 @@
 export interface CheckpointInput {
   /** Current context size divided by the window, in `[0, 1]`. */
   occupancy: number;
+  /**
+   * Conservative occupancy from the larger of the adapter estimates. It can
+   * force the hard checkpoint even when the primary estimate is lower.
+   */
+  safetyOccupancy?: number;
   /** True at a task or phase boundary. */
   atBoundary: boolean;
   /** Current context size in tokens. */
@@ -59,6 +64,7 @@ export function decideCheckpoint(input: CheckpointInput): CheckpointDecision {
   const maxOccupancy = input.maxOccupancy ?? 0.5;
   const urgentOccupancy = input.urgentOccupancy ?? maxOccupancy;
   const hardOccupancy = input.hardOccupancy ?? 0.9;
+  const safetyOccupancy = Math.max(input.occupancy, input.safetyOccupancy ?? input.occupancy);
   const postTokens = Math.min(input.contextTokens, input.checkpointTokens + input.tailTokens);
 
   const decision = (action: CheckpointDecision['action'], reason: CheckpointDecision['reason']): CheckpointDecision => ({
@@ -69,7 +75,7 @@ export function decideCheckpoint(input: CheckpointInput): CheckpointDecision {
     targetOccupancy: (action === 'checkpoint' ? postTokens : input.contextTokens) / input.windowTokens
   });
 
-  if (input.occupancy >= hardOccupancy) return decision('checkpoint', 'hard');
+  if (safetyOccupancy >= hardOccupancy) return decision('checkpoint', 'hard');
   if (input.occupancy >= maxOccupancy && input.atBoundary) return decision('checkpoint', 'boundary');
   if (input.occupancy >= urgentOccupancy) return decision('checkpoint', 'urgency');
   if (input.occupancy >= maxOccupancy) return decision('keep', 'no-boundary');
