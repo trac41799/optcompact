@@ -456,7 +456,8 @@ Policy plugin shape (runs inside the same realm as the engine):
 
 ```js
 export const name = 'optcompact-compaction-policy'
-export const inject = ['compaction', 'tokenMeter', 'llm']
+// The backend is scope-local: read it per call, never require it (ADR-0002).
+export const inject = ['tokenMeter', 'llm']
 export const Config = z.object({ /* threshold, retain, minGain ... */ })
 
 export function apply(ctx, config) {

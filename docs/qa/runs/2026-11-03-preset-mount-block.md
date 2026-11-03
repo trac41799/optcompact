@@ -29,18 +29,19 @@ A new session (`agentPreset: standard`, zero turns) could not be resumed. No ses
 ## Fixes
 
 - `inject` is now `['tokenMeter', 'llm']`. The backend is resolved per call by `compactionOf`, which uses `ctx.get('compaction')` plus a guarded property fallback.
-- A missing backend warns once per session. The evidence records `no-compaction-service`. The step continues with an unchanged decision.
-- The `agent/request-error` overflow path delegates to `next()` when the backend is absent.
-- Four contract tests cover the inert paths. They cover gain mode, checkpoint mode, the overflow handler, and the injected-service list.
+- A missing backend warns once per session. The step paths record `no-compaction-service`. The step continues unchanged.
+- The `agent/request-error` overflow path delegates to `next()` when the backend is absent. It has no turn number, so it writes no evidence.
+- Six contract tests cover the inert paths and the live resolution path. They cover gain mode, checkpoint mode, `ctx.get`, the injected-service list, and both overflow outcomes.
 
 ## Verification
 
-- 96 tests pass, typecheck clean.
+- 98 tests pass, typecheck clean.
 - Offline preset mount with the rebuilt bundle: `inject=[tokenMeter,llm]`, all five rows active, audit empty.
-- Offline mount with the row outside the group. The row activates, the audit stays empty, and the policy stays inert.
+- Offline mount with the row outside the group. The row activates, the audit stays empty, and the policy finds no backend.
 - `dsh --profile tauri --dump-config`: 8 presets, one policy row inside each `compaction` group.
 
 ## Residual
 
 - The running harness must restart to load the rebuilt bundle and the current patch. The failed process had booted before the profile patch was corrected.
 - A hand-edited vendored bundle is replaced by a source build. Never patch the vendored bundle by hand.
+- A row outside the group that still reaches an ancestor scope's backend drives that backend, not the preset's. `compactionOf` does not judge which engine it found.

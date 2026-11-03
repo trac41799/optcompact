@@ -11,7 +11,7 @@ DeepSeek Harness policy plugin that decides when to compact, while the stock `ds
 5. `mode: "gain"` keeps the v0.3 gain-gated policy for comparison.
 6. It re-adds an `agent/request-error` listener for `CONTEXT_WINDOW_EXCEEDED`, delegates recovery to the backend, and retries only after `surface.replaceGeneration` advances.
 
-The backend is resolved per call through `ctx.get('compaction')`, not declared in `inject`. A row that cannot see the preset's isolated `compaction` group then stays inert and warns once, instead of pending.
+The backend is resolved per call through `ctx.get('compaction')`, not declared in `inject`. A row that cannot reach any `compaction` service then stays inert and warns once, instead of pending.
 
 A decision error never blocks the step: the plugin logs a warning and calls `next()`.
 
@@ -33,7 +33,7 @@ dsh --profile <name> --dump-config
 
 Web and Desktop profiles mount an isolated `compaction` group inside each preset. A host-plane insert cannot see that isolated service. Use the generator in [`PRESET-OVERRIDE.md`](PRESET-OVERRIDE.md) to restate each preset with the policy row inside its compaction group. The generated overlay is composition-verified on the real `tauri` dump: 8 presets, 8 groups, one policy row each.
 
-The row must be the last child of that group, beside `compaction-basic`. A row outside the group cannot resolve `compaction`, so it never compacts; since v0.5.1 it warns once and leaves the step alone. Before v0.5.1 the same misplacement declared `compaction` as a required service, the preset mount reported the row as pending, and every session on that preset failed to resume with `agent-preset/invalid`.
+The row must be the last child of that group, beside `compaction-basic`. Cordis resolves a service read through the whole scope chain, so a row placed outside the group either finds nothing — it warns once and leaves the step alone, and the evidence records `no-compaction-service` on the step paths — or, when an ancestor scope still provides `compaction`, it silently drives that ancestor's engine instead of the preset's. Before v0.5.1 the same misplacement declared `compaction` as a required service, the preset mount reported the row as pending, and every session on that preset failed to resume with `agent-preset/invalid`.
 
 ## Configuration
 
@@ -63,11 +63,11 @@ The row must be the last child of that group, beside `compaction-basic`. A row o
 - Checkpoint generation is not detected yet, so a degraded checkpoint is not protected on this path.
 - Cuts snap to the next `user/message` boundary; a session with one step cannot compact.
 - The live proof ran in a headless profile. Web and Desktop isolate the service per preset.
-- A row mounted outside the preset's `compaction` group cannot compact. It warns once per session and records `no-compaction-service` in the evidence instead of failing.
+- A row that cannot reach a `compaction` service cannot compact. It warns once per session and records `no-compaction-service` on the step paths instead of failing. A row outside the preset's group that still reaches an ancestor backend drives that backend, not the preset's.
 
 ## Verification
 
-- 19 contract tests with a fake seam.
+- 22 contract tests with a fake seam.
 - One live headless run with two committed checkpoint transactions ([report](../../docs/qa/runs/2026-10-29-live-dsh.md)).
 
 Occupancy uses `contextPressure.projectedTokens / contextWindow` (the UI meter). Post-compaction `postTokens` and `ratio` use the surface measurement, because the projection carries a heuristic residual until the next request.

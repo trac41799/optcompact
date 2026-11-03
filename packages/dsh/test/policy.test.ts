@@ -225,17 +225,16 @@ test('does not require the compaction service for activation', async () => {
   assert.deepEqual([...module.inject].sort(), ['llm', 'tokenMeter']);
 });
 
-test('stays inert in gain mode when the compaction service is absent', async () => {
+test('stays inert in gain mode when no backend is reachable', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'optcompact-nobackend-'));
   const path = join(dir, 'events.jsonl');
   const warnings: string[] = [];
-  const { ctx, calls } = makeContext({
+  const { ctx } = makeContext({
     compaction: undefined,
     logger: { warn: (message: string) => warnings.push(message) }
   });
   const decision = await maybeCompact(ctx, { evidencePath: path }, makeAgent(), 30, new AbortController().signal);
   assert.equal(decision, null);
-  assert.equal(calls.length, 0);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0] ?? '', /no compaction backend/);
   const records = readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
@@ -243,10 +242,10 @@ test('stays inert in gain mode when the compaction service is absent', async () 
   assert.equal(records.at(-1)?.reason, 'no-compaction-service');
 });
 
-test('stays inert in checkpoint mode when the compaction service is absent', async () => {
+test('stays inert in checkpoint mode when no backend is reachable', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'optcompact-nobackend-cp-'));
   const path = join(dir, 'events.jsonl');
-  const { ctx, calls } = makeContext({ compaction: undefined });
+  const { ctx } = makeContext({ compaction: undefined });
   ctx.tokenMeter.measure = () => meter([[0, 5_000], [10, 60_000], [20, 60_000], [30, 10_000]]);
   const decision = await maybeCheckpoint(
     ctx,
@@ -256,13 +255,41 @@ test('stays inert in checkpoint mode when the compaction service is absent', asy
     new AbortController().signal
   );
   assert.equal(decision, null);
-  assert.equal(calls.length, 0);
   const records = readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
   assert.equal(records.at(-1)?.action, 'skip');
   assert.equal(records.at(-1)?.reason, 'no-compaction-service');
 });
 
-test('overflow recovery delegates to the next handler when the service is absent', async () => {
+test('resolves the backend through ctx.get when the property is not exposed', async () => {
+  // The live plugin reads a scope-local service, so the get() branch is the
+  // production path; a fake that only sets the property never exercises it.
+  const dir = mkdtempSync(join(tmpdir(), 'optcompact-get-'));
+  const path = join(dir, 'events.jsonl');
+  const { ctx } = makeContext({ compaction: undefined });
+  let starts: number[] = [];
+  (ctx as unknown as { get: (name: string) => unknown }).get = (name) =>
+    name === 'compaction'
+      ? {
+          compactRegion: async (start: number) => {
+            starts = [...starts, start];
+          },
+          compactIfNeeded: async () => null
+        }
+      : undefined;
+  const decision = await maybeCheckpoint(
+    ctx,
+    { evidencePath: path, tailNodes: 1 },
+    makeAgent(),
+    30,
+    new AbortController().signal
+  );
+  assert.equal(decision?.action, 'checkpoint');
+  assert.deepEqual(starts, [10]);
+  const records = readFileSync(path, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>);
+  assert.equal(records.at(-1)?.action, 'compacted');
+});
+
+test('overflow recovery delegates to the next handler when no backend is reachable', async () => {
   const handlers = new Map<string, (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>>();
   const ctx = {
     on: (event: string, handler: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => {
@@ -280,6 +307,52 @@ test('overflow recovery delegates to the next handler when the service is absent
     () => Promise.resolve('next')
   );
   assert.equal(result, 'next');
+});
+
+test('overflow recovery compacts and retries only after the surface generation advances', async () => {
+  const handlers = new Map<string, (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>>();
+  const calls: string[] = [];
+  const ctx = {
+    on: (event: string, handler: (payload: unknown, next: () => Promise<unknown>) => Promise<unknown>) => {
+      handlers.set(event, handler);
+    },
+    logger: { warn: () => {} },
+    tokenMeter: { measure: () => ({ totalTokens: 0, surfaceTokens: 0, nodes: [] }) },
+    llm: { resolveModelInfo: async () => ({}) },
+    get: (name: string) =>
+      name === 'compaction'
+        ? {
+            compactRegion: async () => undefined,
+            compactIfNeeded: async () => {
+              calls.push('compactIfNeeded');
+            }
+          }
+        : undefined
+  } as unknown as DshContext;
+  install(ctx, {});
+  const handler = handlers.get('agent/request-error');
+  assert.ok(handler);
+
+  const unchanged = makeAgent(7);
+  const first = await handler(
+    { agent: unchanged, failure: { code: 'CONTEXT_WINDOW_EXCEEDED' }, signal: new AbortController().signal },
+    () => Promise.resolve('next')
+  );
+  assert.equal(first, 'next', 'a backend that changes nothing must not be retried');
+
+  // The handler reads the generation once before the backend call and once
+  // after it; only the second read advancing means the surface really changed.
+  let reads = 0;
+  const advanced = makeAgent();
+  Object.defineProperty(advanced.session.surface, 'replaceGeneration', {
+    get: () => (reads++ === 0 ? 7 : 8)
+  });
+  const second = await handler(
+    { agent: advanced, failure: { code: 'CONTEXT_WINDOW_EXCEEDED' }, signal: new AbortController().signal },
+    () => Promise.resolve('next')
+  );
+  assert.deepEqual(second, { kind: 'retry' });
+  assert.equal(calls.length, 2);
 });
 
 test('snaps a cut to a step boundary marked by a user message', () => {
