@@ -70,6 +70,7 @@ $ pnpm typecheck
 - New bundle copied to `%DSH_HOME%\profiles\tauri\vendor\optcompact-dsh`.
 - Profile import prints `apply,buildUnits,inject,install,maybeCheckpoint,maybeCompact,name,snapCutToStep` and `install-ok`.
 - Activation requires an app restart; the running session keeps its boot composition.
+- Release `v0.5.0` is public; CI run `41550712668` passed.
 
 ## Residual risk
 

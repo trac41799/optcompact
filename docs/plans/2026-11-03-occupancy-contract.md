@@ -55,7 +55,7 @@
 - [x] Bump to 0.5.0 and update the changelog
 - [x] Build and deploy the DSH bundle
 - [x] Run the docs, test, and typecheck gates
-- [ ] Commit, push, tag, and release
+- [x] Commit, push, tag, and release
 
 ## BDD Scenarios
 
