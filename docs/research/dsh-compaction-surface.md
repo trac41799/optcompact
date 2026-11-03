@@ -534,6 +534,12 @@ engine injects host-plane `llm`, `tokenMeter`, and `sessions`
 `toolResultPruner` are isolated. So `inject: ['compaction', 'tokenMeter', 'llm']` works inside the
 group; mounting it at host plane while presets are in use does not.
 
+**Correction (2026-11-04):** that `inject` advice was wrong. A row that cannot see the isolated
+group declares a dependency it can never satisfy, and the preset registry makes a pending row
+fatal for every session on the preset. Read `compaction` per call instead; see
+[ADR-0002](../decisions/ADR-0002-adapter-architecture.md) and the
+[incident](../qa/runs/2026-11-03-preset-mount-block.md).
+
 Mounting. The package ships one bundle patch; the CLI appends the bundle to the end of
 `dsh.profile.bundles`, so its patch lands after `dsh-web-app` and can override its rows
 (`operations.js:106-118`; layer order `@deepseek-ai/dsh/README.md:41-46`).
