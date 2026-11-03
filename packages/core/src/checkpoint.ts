@@ -30,7 +30,7 @@ export interface CheckpointInput {
   tailTokens: number;
   /** Occupancy ceiling for a boundary checkpoint. Defaults to 0.5. */
   maxOccupancy?: number;
-  /** Occupancy that forces a checkpoint without a boundary. Defaults to 0.75. */
+  /** Occupancy that forces a checkpoint without a boundary. Defaults to maxOccupancy (0.5); raise it to require a boundary. */
   urgentOccupancy?: number;
   /** Occupancy that forces a checkpoint immediately. Defaults to 0.9. */
   hardOccupancy?: number;
@@ -52,8 +52,9 @@ export interface CheckpointDecision {
 
 /**
  * Decide whether a boundary checkpoint should run.
- * Boundary checkpoints start at 50% occupancy by default; pressure above 75%
- * overrides the boundary requirement.
+ * Boundary checkpoints start at 50% occupancy by default. With the default
+ * urgency equal to the boundary threshold, the decision fires at the next
+ * pre-step once 50% is crossed. A 0.9 hard guard covers overflow.
  */
 export function decideCheckpoint(input: CheckpointInput): CheckpointDecision {
   if (!(input.windowTokens > 0)) throw new Error('windowTokens must be positive');

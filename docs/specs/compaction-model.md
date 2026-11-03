@@ -433,7 +433,7 @@ Reading: the default policy trades 13.7 points of need coverage for a 62% token 
 
 The v0.4 default replaces gain-gated trimming with boundary distillation.
 
-- **Trigger.** Checkpoint once occupancy reaches 0.5, preferring a turn boundary. Pressure at 0.9 forces the decision.
+- **Trigger.** Checkpoint once occupancy reaches 0.5. With the default `urgentOccupancy` of 0.5 the decision fires at the next pre-step; set `urgentOccupancy` above 0.5 to require a turn boundary. A 0.9 hard guard forces the decision when either estimate reaches it.
 - **Occupancy.** Each adapter MUST supply the best estimate of the next request's prompt size. The provider-anchored sample (`contextPressure.projectedTokens` over `contextPressure.contextWindow` in DeepSeek Harness, provider `inputTokens` in Codex) MUST be selected when it is finite and was taken on the current route. If the sample is absent or the route changed, the adapter MUST fall back to its surface estimate and the freshly resolved window. `selectOccupancy` in `@optcompact/core` implements the selection; the core MUST NOT import harness APIs. The hard 0.9 decision MUST use the larger of the provider and surface estimates.
 - **Tail.** Keep the last `tailNodes` surface nodes verbatim, after step-boundary snapping.
 - **Checkpoint.** Cap the backend summary at `maxTokens` (default 32768). The shipped checkpoint prompt already isolates the request, files, errors, pending work, current work, next step, and critical context.
