@@ -9,19 +9,24 @@ Fixed pressure thresholds (80% of the window, one global limit) trim rather than
 - **Model:** reuse hazard × re-derivation cost, rate-distortion fidelity, boundary checkpoints, prefix-gain scheduling, renewal-reward interval.
 - **Engine:** dependency-free TypeScript, deterministic, no model call on the decision path.
 - **Adapters:** DeepSeek Harness policy plugin (checkpoint mode default), Codex app-server controller and hook parser.
-- **Evidence:** seeded simulator with latent reuse and critical units, plus 85 unit, contract, acceptance, and generator tests.
+- **Evidence:** seeded simulator with latent reuse and critical units, plus 92 unit, contract, acceptance, and generator tests.
 
 ## Decision in one equation
 
 For a context unit `i` with token size `s_i`, last reference `r_i`, re-derivation cost `w_i`, and summary retention `ρ`:
 
-```text
-G_i = λ·L·s_i·(1−ρ)                    tokens saved by not carrying the unit
-    − (λ_in·s_i + λ_o·ρ·s_i)           summary cost, paid once
-    − Λ·(1−φ_i)·V_i                     quality loss, priced
+```math
+\begin{aligned}
+G_i &= \lambda\,L\,s_i\,(1-\rho)
+     && \text{tokens saved by not carrying the unit} \\
+    &\quad - \bigl(\lambda_{\mathrm{in}}\,s_i + \lambda_o\,\rho\,s_i\bigr)
+     && \text{summary cost, paid once} \\
+    &\quad - \Lambda\,(1-\phi_i)\,V_i
+     && \text{quality loss, priced}
+\end{aligned}
 ```
 
-Compact the oldest prefix when its summed gain clears the gate. `V_i` is a discounted reuse-hazard value, `φ_i` is a rate-distortion fidelity curve, and `Λ` prices quality loss above raw re-derivation. Full derivation: [`docs/specs/compaction-model.md`](docs/specs/compaction-model.md).
+Compact the oldest prefix when its summed gain clears the gate. $V_i$ is a discounted reuse-hazard value, $\phi_i$ is a rate-distortion fidelity curve, and $\Lambda$ prices quality loss above raw re-derivation. Full derivation: [`docs/specs/compaction-model.md`](docs/specs/compaction-model.md).
 
 ## Measured results
 
@@ -117,14 +122,14 @@ packages/dsh       DeepSeek Harness plugin
 packages/codex     Codex controller and hooks
 packages/sim       simulator and benchmarks
 docs/specs         normative model and product spec
-docs/decisions     ADR-0001 model, ADR-0002 adapters
+docs/decisions     ADR-0001..0005 model, adapters, checkpoint, occupancy
 docs/research      harness surfaces and literature
 docs/qa            testing strategy and run evidence
 ```
 
 ## Status and limitations
 
-- v0.3.0. The model and both adapters are implemented.
+- v0.5.0. The model and both adapters are implemented.
 - The DeepSeek Harness plugin passed a live headless run with two committed compactions.
 - The Codex app-server protocol is verified. A full compaction of a populated thread waits on account quota.
 - Web and Desktop use a generated preset overlay. Composition is verified; a live Web boot was not run in this repository.
